@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Glowing Cyber Circle represent AI focal point -->
+    <path
+        android:pathData="M54,54m-28,0a28,28 0 1,1 56,0a28,28 0 1,1 -56,0"
+        android:fillColor="#00000000"
+        android:strokeWidth="4"
+        android:strokeColor="#00FFFF" />
+
+    <!-- Triangles representing Video synthesis playback -->
+    <path
+        android:pathData="M48,42 L48,66 L68,54 Z"
+        android:fillColor="#8A2BE2" />
+
+    <!-- Shimmer particle -->
+    <path
+        android:pathData="M78,32 L81,35 L78,38 L75,35 Z"
+        android:fillColor="#00FFFF" />
+
+    <!-- Secondary particle -->
+    <path
+        android:pathData="M30,72 L32,74 L30,76 L28,74 Z"
+        android:fillColor="#8A2BE2" />
+</vector>

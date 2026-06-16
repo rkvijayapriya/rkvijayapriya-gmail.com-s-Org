@@ -1,0 +1,6 @@
+{
+  "name": "VisionAI Studio",
+  "description": "AI Video, AI Image, AI Voiceover, and AI Writing Assistant Studio",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
