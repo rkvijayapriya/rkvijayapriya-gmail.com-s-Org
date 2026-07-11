@@ -27,6 +27,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.asImageBitmap
+import android.graphics.BitmapFactory
+import android.util.Base64
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.database.VisionAiCreation
@@ -40,7 +43,8 @@ import java.util.Locale
 @Composable
 fun HistoryScreen(
     viewModel: MainViewModel,
-    onNavigateToPlayer: () -> Unit
+    onNavigateToPlayer: () -> Unit,
+    onBack: () -> Unit
 ) {
     val context = LocalContext.current
     val lang by viewModel.currentLanguage.collectAsState()
@@ -70,18 +74,33 @@ fun HistoryScreen(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header
+            // Header with Back Button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = Translation.getString("history", lang),
-                    fontSize = (22 * scale).sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.testTag("history_back_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Go Back",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                    Text(
+                        text = Translation.getString("history", lang),
+                        fontSize = (22 * scale).sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
 
                 // Delete all option
                 if (creations.isNotEmpty()) {
@@ -213,6 +232,17 @@ fun HistoryScreen(
                             onDelete = {
                                 viewModel.deleteCreation(item.id)
                                 Toast.makeText(context, "Item deleted from offline cache.", Toast.LENGTH_SHORT).show()
+                            },
+                            onExport = {
+                                com.example.ui.components.MediaExportHelper.exportCreation(context, item) { success, path ->
+                                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                        if (success) {
+                                            Toast.makeText(context, "Exported successfully: $path", Toast.LENGTH_LONG).show()
+                                        } else {
+                                            Toast.makeText(context, "Export failed: $path", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
                             }
                         )
                     }
@@ -228,10 +258,24 @@ fun HistoryItemCard(
     scale: Float,
     lang: String,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onExport: () -> Unit
 ) {
     val dateFormatter = remember { SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault()) }
     val formattedDate = remember(item.timestamp) { dateFormatter.format(Date(item.timestamp)) }
+
+    val decodedBitmap = remember(item) {
+        if (item.type == "IMAGE" && item.responseText.isNotBlank()) {
+            try {
+                val decodedBytes = Base64.decode(item.responseText, Base64.DEFAULT)
+                BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+            } catch (e: Exception) {
+                null
+            }
+        } else {
+            null
+        }
+    }
 
     val icon = when (item.type) {
         "VIDEO" -> Icons.Default.PlayArrow
@@ -262,19 +306,29 @@ fun HistoryItemCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Rounded Type symbol representation with ambient glow
+            // Rounded Type symbol representation or beautiful thumbnail
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .background(typeColor.copy(alpha = 0.12f), RoundedCornerShape(12.dp)),
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(typeColor.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = typeColor,
-                    modifier = Modifier.size(24.dp)
-                )
+                if (decodedBitmap != null) {
+                    androidx.compose.foundation.Image(
+                        bitmap = decodedBitmap.asImageBitmap(),
+                        contentDescription = "Thumbnail",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = typeColor,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
 
             // Central info text column
@@ -298,6 +352,18 @@ fun HistoryItemCard(
                     text = "$formattedDate • ${item.style}",
                     fontSize = (10 * scale).sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
+            }
+
+            // Export / Download Button
+            IconButton(
+                onClick = onExport,
+                modifier = Modifier.testTag("export_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Share,
+                    contentDescription = Translation.getString("download", lang),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
                 )
             }
 

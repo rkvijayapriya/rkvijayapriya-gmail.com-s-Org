@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">VisionAI Studio</string>
+    <string name="app_name">NovaAI Studio</string>
+    <string name="empty_tag" translatable="false"></string>
 </resources>

@@ -9,6 +9,7 @@ import com.example.ui.MainApp
 import com.example.ui.MainViewModel
 
 class MainActivity : ComponentActivity() {
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()

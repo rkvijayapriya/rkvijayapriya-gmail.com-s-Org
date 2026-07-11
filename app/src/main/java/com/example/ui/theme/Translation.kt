@@ -2,7 +2,7 @@ package com.example.ui.theme
 
 object Translation {
     private val EnglishMap = mapOf(
-        "app_title" to "VisionAI Studio",
+        "app_title" to "NovaAI Studio",
         "app_subtitle" to "Text & Image to Video, Voiceover, Writing Copy",
         "login" to "Login",
         "sign_up" to "Sign Up",
@@ -64,14 +64,14 @@ object Translation {
         "writing_desk" to "AI Content Hub",
         "writing_placeholder" to "Describe what you want the assistant to write...",
         "copied" to "Copied to clipboard successfully!",
-        "premium_notice" to "VisionAI Ad-Free Premium Active",
+        "premium_notice" to "NovaAI Ad-Free Premium Active",
         "save_success" to "Saved to Device Internal Storage successfully!",
         "offline_notice" to "Your offline archive is up to date and secured.",
         "example_prompt" to "Example: A majestic white horse running through a golden desert during sunset, cinematic lighting, ultra realistic..."
     )
 
     private val TamilMap = mapOf(
-        "app_title" to "விஷன்AI ஸ்டுடியோ",
+        "app_title" to "நோவாAI ஸ்டுடியோ",
         "app_subtitle" to "Text மற்றும் Image மூலம் AI வீடியோ, குரல் மற்றும் உரை உருவாக்கம்",
         "login" to "உள்நுழைக",
         "sign_up" to "பதிவு செய்க",

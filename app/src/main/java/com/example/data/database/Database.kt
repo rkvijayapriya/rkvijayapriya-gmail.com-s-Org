@@ -32,7 +32,8 @@ data class VisionAiCreation(
     val generatedDescription: String = "",
     val generatedHashtags: String = "",
     val generatedScript: String = "",
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val userEmail: String = ""
 )
 
 @Dao
@@ -61,6 +62,9 @@ interface VisionAiCreationDao {
     @Query("SELECT * FROM ai_creations ORDER BY timestamp DESC")
     fun getAllCreations(): Flow<List<VisionAiCreation>>
 
+    @Query("SELECT * FROM ai_creations WHERE userEmail = :userEmail ORDER BY timestamp DESC")
+    fun getCreationsByUser(userEmail: String): Flow<List<VisionAiCreation>>
+
     @Query("SELECT * FROM ai_creations WHERE type = :type ORDER BY timestamp DESC")
     fun getCreationsByType(type: String): Flow<List<VisionAiCreation>>
 
@@ -77,7 +81,7 @@ interface VisionAiCreationDao {
     suspend fun deleteAll()
 }
 
-@Database(entities = [UserAccount::class, VisionAiCreation::class], version = 1, exportSchema = false)
+@Database(entities = [UserAccount::class, VisionAiCreation::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun userAccountDao(): UserAccountDao
     abstract fun visionAiCreationDao(): VisionAiCreationDao

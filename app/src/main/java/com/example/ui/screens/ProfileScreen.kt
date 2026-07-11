@@ -34,7 +34,8 @@ import com.example.ui.theme.Translation
 @Composable
 fun ProfileScreen(
     viewModel: MainViewModel,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onBack: () -> Unit
 ) {
     val context = LocalContext.current
     val lang by viewModel.currentLanguage.collectAsState()
@@ -69,13 +70,29 @@ fun ProfileScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Profile Header
-            Text(
-                text = Translation.getString("profile", lang),
-                fontWeight = FontWeight.Bold,
-                fontSize = (22 * scale).sp,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            // Profile Header with Back Button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.testTag("profile_back_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Go Back",
+                        tint = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+                Text(
+                    text = Translation.getString("profile", lang),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = (22 * scale).sp,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
 
             // Dynamic User Profile Card
             userAccount?.let { user ->

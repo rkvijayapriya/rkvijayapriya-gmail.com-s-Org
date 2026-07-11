@@ -27,6 +27,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.asImageBitmap
+import android.graphics.BitmapFactory
+import android.util.Base64
 import com.example.data.database.VisionAiCreation
 import com.example.ui.MainViewModel
 import com.example.ui.theme.Translation
@@ -58,20 +61,89 @@ fun VideoPlayerScreen(
         return
     }
 
+    val decodedBitmap = remember(activeItem) {
+        if (activeItem.type == "IMAGE" && activeItem.responseText.isNotBlank()) {
+            try {
+                val decodedBytes = Base64.decode(activeItem.responseText, Base64.DEFAULT)
+                BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+            } catch (e: Exception) {
+                null
+            }
+        } else {
+            null
+        }
+    }
+
+    // Real audio path resolver for voiceover tracks
+    val audioPath = remember(activeItem) {
+        if (activeItem.type == "VOICEOVER") {
+            val path = activeItem.responseText
+            if (path.isNotBlank() && java.io.File(path).exists()) path else ""
+        } else {
+            ""
+        }
+    }
+
     var isPlaying by remember { mutableStateOf(true) }
-    var sliderProgress by remember { mutableStateOf(0.4f) }
+    var sliderProgress by remember { mutableStateOf(0.1f) }
     var isFullScreen by remember { mutableStateOf(false) }
 
-    // Auto update seek bar over duration when playing
-    LaunchedEffect(isPlaying) {
-        if (isPlaying) {
-            while (true) {
-                delay(200)
-                sliderProgress = (sliderProgress + 0.01f)
-                if (sliderProgress >= 1f) {
-                    sliderProgress = 0f
+    val mediaPlayer = remember { android.media.MediaPlayer() }
+    var durationMillis by remember { mutableStateOf(activeItem.duration * 1000) }
+
+    // Load media player source if it is a real voiceover file
+    LaunchedEffect(audioPath) {
+        if (audioPath.isNotBlank()) {
+            try {
+                mediaPlayer.reset()
+                mediaPlayer.setDataSource(audioPath)
+                mediaPlayer.prepare()
+                durationMillis = mediaPlayer.duration.coerceAtLeast(100)
+                sliderProgress = 0f
+                
+                mediaPlayer.setOnCompletionListener {
+                    isPlaying = false
+                    sliderProgress = 1.0f
                 }
+                
+                if (isPlaying) {
+                    mediaPlayer.start()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
+        }
+    }
+
+    // Auto update seek bar over duration when playing
+    LaunchedEffect(isPlaying, audioPath) {
+        if (isPlaying) {
+            while (isPlaying) {
+                if (audioPath.isNotBlank()) {
+                    try {
+                        val pos = mediaPlayer.currentPosition
+                        sliderProgress = (pos.toFloat() / durationMillis).coerceIn(0f, 1f)
+                    } catch (e: Exception) {
+                        // ignore state errors
+                    }
+                } else {
+                    sliderProgress += 0.01f
+                    if (sliderProgress >= 1f) {
+                        sliderProgress = 0f
+                    }
+                }
+                delay(120)
+            }
+        }
+    }
+
+    // Dispose resource gracefully
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                mediaPlayer.stop()
+                mediaPlayer.release()
+            } catch (e: Exception) {}
         }
     }
 
@@ -81,6 +153,14 @@ fun VideoPlayerScreen(
         "Watercolor", "Cartoon" -> Color(0xFF00FFCC)
         "Clay Animation", "Sand Art" -> Color(0xFF8B4513)
         else -> MaterialTheme.colorScheme.primary
+    }
+
+    val currentRatio = remember(activeItem) {
+        val res = activeItem.resolution
+        val angle = activeItem.cameraAngle
+        if (res.contains("9:16") || angle.contains("9:16")) 9f / 16f
+        else if (res.contains("1:1") || angle.contains("1:1")) 1f
+        else 16f / 9f // Default widescreen 16:9
     }
 
     Box(
@@ -99,75 +179,106 @@ fun VideoPlayerScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(if (isFullScreen) 0.8f else 1.6f)
+                    .aspectRatio(if (isFullScreen) 0.6f else currentRatio)
                     .background(Color.Black),
                 contentAlignment = Alignment.BottomCenter
             ) {
                 // Moving algorithmic canvas representing render playback!
-                Canvas(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .testTag("procedural_video_canvas")
-                ) {
-                    val width = size.width
-                    val height = size.height
-
-                    clipRect {
-                        // Drawing moving fluid cyberwave
-                        val steps = 80
-                        val waveAmplitude = 40f
-                        val phase = sliderProgress * 2 * Math.PI.toFloat()
-                        
-                        // Main gradient fill base
-                        drawRect(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(Color(0xFF0C0720), Color(0xFF03010C))
-                            )
-                        )
-
-                        // Visual nodes/pixels representing active style preset
-                        val particleCount = 20
-                        for (i in 0 until particleCount) {
-                            val seedX = (sin(i.toDouble()) * 0.5 + 0.5) * width
-                            val seedY = ((sliderProgress + i * 0.05) % 1.0) * height
-                            
-                            drawCircle(
-                                color = styleColor.copy(alpha = 0.15f),
-                                radius = 24.dp.toPx() + sin(phase + i) * 6.dp.toPx(),
-                                center = Offset(seedX.toFloat(), seedY.toFloat())
+                if (activeItem.type == "IMAGE" && decodedBitmap != null) {
+                    androidx.compose.foundation.Image(
+                        bitmap = decodedBitmap.asImageBitmap(),
+                        contentDescription = activeItem.prompt,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("generated_image_display"),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                    )
+                } else {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        if (decodedBitmap != null) {
+                            androidx.compose.foundation.Image(
+                                bitmap = decodedBitmap.asImageBitmap(),
+                                contentDescription = activeItem.prompt,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .testTag("generated_image_display"),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
                             )
                         }
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag("procedural_video_canvas")
+                        ) {
+                            val width = size.width
+                            val height = size.height
 
-                        // Plot dynamic sine-waves representing cinematic lighting tracking
-                        for (w in 0..1) {
-                            val pathPoints = mutableListOf<Offset>()
-                            for (x in 0..steps) {
-                                val t = x.toFloat() / steps
-                                val xPos = t * width
-                                val waveFactor = sin(t * 3 * Math.PI.toFloat() + phase + (w * 1.5))
-                                val yPos = (height / 2) + waveFactor * waveAmplitude
-                                pathPoints.add(Offset(xPos, yPos.toFloat()))
+                            clipRect {
+                                // Drawing moving fluid cyberwave
+                                val steps = 80
+                                val waveAmplitude = 40f
+                                val phase = sliderProgress * 2 * Math.PI.toFloat()
+                                
+                                // Main gradient fill base (solid if no image, transparent overlay if has image)
+                                if (decodedBitmap == null) {
+                                    drawRect(
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(Color(0xFF0C0720), Color(0xFF03010C))
+                                        )
+                                    )
+                                } else {
+                                    drawRect(
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(Color(0x550C0720), Color(0x7F03010C))
+                                        )
+                                    )
+                                }
+
+                                // Visual nodes/pixels representing active style preset
+                                val particleCount = 20
+                                for (i in 0 until particleCount) {
+                                    val seedX = (sin(i.toDouble()) * 0.5 + 0.5) * width
+                                    val seedY = ((sliderProgress + i * 0.05) % 1.0) * height
+                                    
+                                    drawCircle(
+                                        color = styleColor.copy(alpha = if (decodedBitmap == null) 0.15f else 0.35f),
+                                        radius = 24.dp.toPx() + sin(phase + i) * 6.dp.toPx(),
+                                        center = Offset(seedX.toFloat(), seedY.toFloat())
+                                    )
+                                }
+
+                                // Plot dynamic sine-waves representing cinematic lighting tracking
+                                for (w in 0..1) {
+                                    val pathPoints = mutableListOf<Offset>()
+                                    for (x in 0..steps) {
+                                        val t = x.toFloat() / steps
+                                        val xPos = t * width
+                                        val waveFactor = sin(t * 3 * Math.PI.toFloat() + phase + (w * 1.5))
+                                        val yPos = (height / 2) + waveFactor * waveAmplitude
+                                        pathPoints.add(Offset(xPos, yPos.toFloat()))
+                                    }
+
+                                    for (p in 0 until pathPoints.size - 1) {
+                                        drawLine(
+                                            color = if (w == 0) styleColor else Color(0xFF00FFFF),
+                                            start = pathPoints[p],
+                                            end = pathPoints[p + 1],
+                                            strokeWidth = 3.dp.toPx()
+                                        )
+                                    }
+                                }
+
+                                // Abstract floating particles
+                                for (p in 0..12) {
+                                    val pX = (sin(p.toDouble() * 1.5) * 0.5 + 0.5) * width
+                                    val pY = (sin(p.toDouble() * 3) * 0.5 + 0.5) * height
+                                    drawCircle(
+                                        color = Color.White.copy(alpha = 0.4f),
+                                        radius = 2.dp.toPx(),
+                                        center = Offset(pX.toFloat(), pY.toFloat())
+                                    )
+                                }
                             }
-
-                            for (p in 0 until pathPoints.size - 1) {
-                                drawLine(
-                                    color = if (w == 0) styleColor else Color(0xFF00FFFF),
-                                    start = pathPoints[p],
-                                    end = pathPoints[p + 1],
-                                    strokeWidth = 3.dp.toPx()
-                                )
-                            }
-                        }
-
-                        // Abstract floating particles
-                        for (p in 0..12) {
-                            val pX = (sin(p.toDouble() * 1.5) * 0.5 + 0.5) * width
-                            val pY = (sin(p.toDouble() * 3) * 0.5 + 0.5) * height
-                            drawCircle(
-                                color = Color.White.copy(alpha = 0.4f),
-                                radius = 2.dp.toPx(),
-                                center = Offset(pX.toFloat(), pY.toFloat())
-                            )
                         }
                     }
                 }
@@ -183,7 +294,15 @@ fun VideoPlayerScreen(
                     // Custom immersive Seekbar
                     Slider(
                         value = sliderProgress,
-                        onValueChange = { sliderProgress = it },
+                        onValueChange = { progress ->
+                            sliderProgress = progress
+                            if (audioPath.isNotBlank()) {
+                                try {
+                                    val targetMs = (progress * durationMillis).toInt()
+                                    mediaPlayer.seekTo(targetMs)
+                                } catch (e: Exception) {}
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth().height(24.dp).testTag("video_seekbar"),
                         colors = SliderDefaults.colors(
                             thumbColor = styleColor,
@@ -206,7 +325,23 @@ fun VideoPlayerScreen(
 
                             // Play / Pause toggler
                             IconButton(
-                                onClick = { isPlaying = !isPlaying },
+                                onClick = {
+                                    try {
+                                        if (isPlaying) {
+                                            if (audioPath.isNotBlank()) {
+                                                mediaPlayer.pause()
+                                            }
+                                            isPlaying = false
+                                        } else {
+                                            if (audioPath.isNotBlank()) {
+                                                mediaPlayer.start()
+                                            }
+                                            isPlaying = true
+                                        }
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
+                                    }
+                                },
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(styleColor.copy(alpha = 0.2f))
@@ -334,7 +469,7 @@ fun VideoPlayerScreen(
                                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                         type = "text/plain"
                                         putExtra(Intent.EXTRA_SUBJECT, activeItem.title)
-                                        putExtra(Intent.EXTRA_TEXT, "Look at this spectacular AI Content I generated in VisionAI Studio: ${activeItem.title}\nScript: ${activeItem.generatedScript}")
+                                        putExtra(Intent.EXTRA_TEXT, "Look at this spectacular AI Content I generated in NovaAI Studio: ${activeItem.title}\nScript: ${activeItem.generatedScript}")
                                     }
                                     context.startActivity(Intent.createChooser(shareIntent, "Share with friends"))
                                 } catch (e: Exception) {

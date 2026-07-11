@@ -88,7 +88,7 @@ fun LoginScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.PlayArrow,
-                    contentDescription = "VisionAI Lens",
+                    contentDescription = "NovaAI Lens",
                     tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(44.dp)
                 )
@@ -452,13 +452,28 @@ fun SignUpScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = Translation.getString("create_account", lang),
-                fontSize = (26 * scale).sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                textAlign = TextAlign.Center
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                IconButton(
+                    onClick = onNavigateToLogin,
+                    modifier = Modifier.testTag("signup_back_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Go Back",
+                        tint = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+                Text(
+                    text = Translation.getString("create_account", lang),
+                    fontSize = (24 * scale).sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 
