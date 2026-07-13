@@ -1,7 +1,13 @@
 package com.example.ui.screens
 
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.widget.Toast
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -23,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -53,6 +60,51 @@ fun LoginScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var showForgotDialog by remember { mutableStateOf(false) }
     var showBiometricOverlay by remember { mutableStateOf(false) }
+
+    var activeSpeechTarget by remember { mutableStateOf<String?>(null) }
+    var activeFileTarget by remember { mutableStateOf<String?>(null) }
+
+    var selectedMediaUriEmail by remember { mutableStateOf<Uri?>(null) }
+    var selectedMediaNameEmail by remember { mutableStateOf<String?>(null) }
+
+    var selectedMediaUriPassword by remember { mutableStateOf<Uri?>(null) }
+    var selectedMediaNamePassword by remember { mutableStateOf<String?>(null) }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val name = uri.lastPathSegment ?: "Selected File"
+            when (activeFileTarget) {
+                "email" -> {
+                    selectedMediaUriEmail = uri
+                    selectedMediaNameEmail = name
+                }
+                "password" -> {
+                    selectedMediaUriPassword = uri
+                    selectedMediaNamePassword = name
+                }
+            }
+            Toast.makeText(context, "File selected: $name", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val speechRecognizerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val data = result.data
+            val results = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            if (!results.isNullOrEmpty()) {
+                val spokenText = results[0]
+                when (activeSpeechTarget) {
+                    "email" -> email = if (email.isBlank()) spokenText else "$email $spokenText"
+                    "password" -> password = if (password.isBlank()) spokenText else "$password $spokenText"
+                }
+                Toast.makeText(context, "Voice input appended!", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     val backgroundGradient = Brush.verticalGradient(
         colors = listOf(
@@ -130,9 +182,54 @@ fun LoginScreen(
                     .fillMaxWidth()
                     .testTag("username_input"),
                 leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                trailingIcon = {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
+                        IconButton(onClick = { activeFileTarget = "email"; filePickerLauncher.launch("*/*") }) {
+                            Icon(Icons.Default.Add, contentDescription = "Add Attachment", tint = MaterialTheme.colorScheme.primary)
+                        }
+                        IconButton(onClick = {
+                            activeSpeechTarget = "email"
+                            try {
+                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                                }
+                                speechRecognizerLauncher.launch(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Speech recognition not supported on this device", Toast.LENGTH_SHORT).show()
+                            }
+                        }) {
+                            Icon(Icons.Default.Mic, contentDescription = "Speak text", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 singleLine = true
             )
+
+            selectedMediaUriEmail?.let { uri ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text(
+                        text = "Attached: $selectedMediaNameEmail",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    IconButton(onClick = { selectedMediaUriEmail = null; selectedMediaNameEmail = null }, modifier = Modifier.size(16.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(12.dp))
+                    }
+                }
+            }
 
             // Password Input
             OutlinedTextField(
@@ -153,18 +250,61 @@ fun LoginScreen(
                     .testTag("password_input"),
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 trailingIcon = {
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(
-                            imageVector = if (passwordVisible) Icons.Default.Edit else Icons.Default.Lock,
-                            contentDescription = "Toggle password visibility",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                imageVector = if (passwordVisible) Icons.Default.Edit else Icons.Default.Lock,
+                                contentDescription = "Toggle password visibility",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(onClick = { activeFileTarget = "password"; filePickerLauncher.launch("*/*") }) {
+                            Icon(Icons.Default.Add, contentDescription = "Add Attachment", tint = MaterialTheme.colorScheme.primary)
+                        }
+                        IconButton(onClick = {
+                            activeSpeechTarget = "password"
+                            try {
+                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                                }
+                                speechRecognizerLauncher.launch(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Speech recognition not supported on this device", Toast.LENGTH_SHORT).show()
+                            }
+                        }) {
+                            Icon(Icons.Default.Mic, contentDescription = "Speak text", tint = MaterialTheme.colorScheme.primary)
+                        }
                     }
                 },
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true
             )
+
+            selectedMediaUriPassword?.let { uri ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text(
+                        text = "Attached: $selectedMediaNamePassword",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    IconButton(onClick = { selectedMediaUriPassword = null; selectedMediaNamePassword = null }, modifier = Modifier.size(16.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(12.dp))
+                    }
+                }
+            }
 
             // Forgot password Link
             Text(
@@ -209,6 +349,57 @@ fun LoginScreen(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimary
                 )
+            }
+
+            // Google Sign-In Option
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                Text("OR", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
+                HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+            }
+
+            OutlinedButton(
+                onClick = {
+                    viewModel.googleSignIn { success, message ->
+                        if (success) {
+                            coroutineScope.launch {
+                                onLoginSuccess()
+                            }
+                        } else {
+                            coroutineScope.launch(Dispatchers.Main) {
+                                Toast.makeText(context, "Google Sign-In: $message", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .testTag("google_sign_in_button"),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AccountCircle,
+                        contentDescription = "Google Logo",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "Sign in with Google",
+                        fontSize = (15 * scale).sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
             }
 
             // Biometric Option
@@ -430,6 +621,67 @@ fun SignUpScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
+    var activeSpeechTarget by remember { mutableStateOf<String?>(null) }
+    var activeFileTarget by remember { mutableStateOf<String?>(null) }
+
+    var selectedMediaUriName by remember { mutableStateOf<Uri?>(null) }
+    var selectedMediaNameName by remember { mutableStateOf<String?>(null) }
+
+    var selectedMediaUriUsername by remember { mutableStateOf<Uri?>(null) }
+    var selectedMediaNameUsername by remember { mutableStateOf<String?>(null) }
+
+    var selectedMediaUriEmail by remember { mutableStateOf<Uri?>(null) }
+    var selectedMediaNameEmail by remember { mutableStateOf<String?>(null) }
+
+    var selectedMediaUriPassword by remember { mutableStateOf<Uri?>(null) }
+    var selectedMediaNamePassword by remember { mutableStateOf<String?>(null) }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val fName = uri.lastPathSegment ?: "Selected File"
+            when (activeFileTarget) {
+                "name" -> {
+                    selectedMediaUriName = uri
+                    selectedMediaNameName = fName
+                }
+                "username" -> {
+                    selectedMediaUriUsername = uri
+                    selectedMediaNameUsername = fName
+                }
+                "email" -> {
+                    selectedMediaUriEmail = uri
+                    selectedMediaNameEmail = fName
+                }
+                "password" -> {
+                    selectedMediaUriPassword = uri
+                    selectedMediaNamePassword = fName
+                }
+            }
+            Toast.makeText(context, "File selected: $fName", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val speechRecognizerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val data = result.data
+            val results = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            if (!results.isNullOrEmpty()) {
+                val spokenText = results[0]
+                when (activeSpeechTarget) {
+                    "name" -> name = if (name.isBlank()) spokenText else "$name $spokenText"
+                    "username" -> username = if (username.isBlank()) spokenText else "$username $spokenText"
+                    "email" -> email = if (email.isBlank()) spokenText else "$email $spokenText"
+                    "password" -> password = if (password.isBlank()) spokenText else "$password $spokenText"
+                }
+                Toast.makeText(context, "Voice input appended!", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     val backgroundGradient = Brush.verticalGradient(
         colors = listOf(
             MaterialTheme.colorScheme.background,
@@ -477,6 +729,7 @@ fun SignUpScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            // Name Input
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -492,9 +745,55 @@ fun SignUpScreen(
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                trailingIcon = {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
+                        IconButton(onClick = { activeFileTarget = "name"; filePickerLauncher.launch("*/*") }) {
+                            Icon(Icons.Default.Add, contentDescription = "Add Attachment", tint = MaterialTheme.colorScheme.primary)
+                        }
+                        IconButton(onClick = {
+                            activeSpeechTarget = "name"
+                            try {
+                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                                }
+                                speechRecognizerLauncher.launch(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Speech recognition not supported on this device", Toast.LENGTH_SHORT).show()
+                            }
+                        }) {
+                            Icon(Icons.Default.Mic, contentDescription = "Speak text", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                },
                 singleLine = true
             )
 
+            selectedMediaUriName?.let { uri ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text(
+                        text = "Attached: $selectedMediaNameName",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    IconButton(onClick = { selectedMediaUriName = null; selectedMediaNameName = null }, modifier = Modifier.size(16.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(12.dp))
+                    }
+                }
+            }
+
+            // Username Input
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
@@ -510,9 +809,55 @@ fun SignUpScreen(
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                trailingIcon = {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
+                        IconButton(onClick = { activeFileTarget = "username"; filePickerLauncher.launch("*/*") }) {
+                            Icon(Icons.Default.Add, contentDescription = "Add Attachment", tint = MaterialTheme.colorScheme.primary)
+                        }
+                        IconButton(onClick = {
+                            activeSpeechTarget = "username"
+                            try {
+                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                                }
+                                speechRecognizerLauncher.launch(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Speech recognition not supported on this device", Toast.LENGTH_SHORT).show()
+                            }
+                        }) {
+                            Icon(Icons.Default.Mic, contentDescription = "Speak text", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                },
                 singleLine = true
             )
 
+            selectedMediaUriUsername?.let { uri ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text(
+                        text = "Attached: $selectedMediaNameUsername",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    IconButton(onClick = { selectedMediaUriUsername = null; selectedMediaNameUsername = null }, modifier = Modifier.size(16.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(12.dp))
+                    }
+                }
+            }
+
+            // Email Input
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
@@ -528,10 +873,56 @@ fun SignUpScreen(
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                trailingIcon = {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
+                        IconButton(onClick = { activeFileTarget = "email"; filePickerLauncher.launch("*/*") }) {
+                            Icon(Icons.Default.Add, contentDescription = "Add Attachment", tint = MaterialTheme.colorScheme.primary)
+                        }
+                        IconButton(onClick = {
+                            activeSpeechTarget = "email"
+                            try {
+                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                                }
+                                speechRecognizerLauncher.launch(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Speech recognition not supported on this device", Toast.LENGTH_SHORT).show()
+                            }
+                        }) {
+                            Icon(Icons.Default.Mic, contentDescription = "Speak text", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 singleLine = true
             )
 
+            selectedMediaUriEmail?.let { uri ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text(
+                        text = "Attached: $selectedMediaNameEmail",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    IconButton(onClick = { selectedMediaUriEmail = null; selectedMediaNameEmail = null }, modifier = Modifier.size(16.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(12.dp))
+                    }
+                }
+            }
+
+            // Password Input
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
@@ -547,10 +938,55 @@ fun SignUpScreen(
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                trailingIcon = {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
+                        IconButton(onClick = { activeFileTarget = "password"; filePickerLauncher.launch("*/*") }) {
+                            Icon(Icons.Default.Add, contentDescription = "Add Attachment", tint = MaterialTheme.colorScheme.primary)
+                        }
+                        IconButton(onClick = {
+                            activeSpeechTarget = "password"
+                            try {
+                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                                }
+                                speechRecognizerLauncher.launch(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Speech recognition not supported on this device", Toast.LENGTH_SHORT).show()
+                            }
+                        }) {
+                            Icon(Icons.Default.Mic, contentDescription = "Speak text", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                },
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true
             )
+
+            selectedMediaUriPassword?.let { uri ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text(
+                        text = "Attached: $selectedMediaNamePassword",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    IconButton(onClick = { selectedMediaUriPassword = null; selectedMediaNamePassword = null }, modifier = Modifier.size(16.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(12.dp))
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 

@@ -37,6 +37,7 @@ import com.example.ui.theme.NovaPrimary
 import com.example.ui.theme.NovaSecondary
 import com.example.ui.theme.NovaTertiary
 import com.example.data.database.VisionAiCreation
+import com.example.ui.components.DownloadSettingsDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -91,6 +92,7 @@ fun VideoEditorScreen(
     var isRendering by remember { mutableStateOf(false) }
     var renderProgress by remember { mutableStateOf(0f) }
     var renderedSuccessMessage by remember { mutableStateOf<String?>(null) }
+    var showDownloadDialog by remember { mutableStateOf(false) }
 
     // Synchronize trim limits based on active creation duration
     LaunchedEffect(activeCreation) {
@@ -792,7 +794,7 @@ fun VideoEditorScreen(
                                     ) {
                                         Button(
                                             onClick = {
-                                                Toast.makeText(context, "Saved successfully to device memory!", Toast.LENGTH_SHORT).show()
+                                                showDownloadDialog = true
                                             },
                                             colors = ButtonDefaults.buttonColors(containerColor = NovaPrimary),
                                             modifier = Modifier.weight(1f),
@@ -1092,5 +1094,28 @@ fun VideoEditorScreen(
                 }
             }
         }
+    }
+
+    if (showDownloadDialog) {
+        DownloadSettingsDialog(
+            mediaType = "VIDEO",
+            onDismissRequest = { showDownloadDialog = false },
+            onConfirmDownload = { format, quality, includeMetadata ->
+                val creation = activeCreation
+                if (creation != null) {
+                    com.example.ui.components.MediaExportHelper.exportCreation(context, creation) { success, path ->
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            if (success) {
+                                Toast.makeText(context, "Exported edited video: $path ($format, $quality)", Toast.LENGTH_LONG).show()
+                            } else {
+                                Toast.makeText(context, "Export failed: $path", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                } else {
+                    Toast.makeText(context, "Saved successfully to device memory! ($format, $quality)", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
     }
 }

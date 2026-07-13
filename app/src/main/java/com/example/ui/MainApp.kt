@@ -23,7 +23,9 @@ import com.example.ui.theme.*
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.input.pointer.pointerInput
 import com.example.ui.components.ShortcutManager
 import com.example.ui.components.KeyboardShortcutManagerDialog
 
@@ -184,21 +186,6 @@ fun MainApp(viewModel: MainViewModel) {
                             )
                         )
 
-                        // Vocal TTS Tab
-                        NavigationBarItem(
-                            selected = currentRoute == ScreenRoute.VOICEOVER,
-                            onClick = { currentRoute = ScreenRoute.VOICEOVER },
-                            icon = { Icon(Icons.Default.Mic, contentDescription = "Voiceover") },
-                            label = { Text("Voice", style = MaterialTheme.typography.bodySmall) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.onSurface,
-                                selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                unselectedIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                unselectedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                indicatorColor = MaterialTheme.colorScheme.secondaryContainer
-                            )
-                        )
-
                         // Professional Video Editor Tab
                         NavigationBarItem(
                             selected = currentRoute == ScreenRoute.VIDEO_EDITOR,
@@ -251,8 +238,48 @@ fun MainApp(viewModel: MainViewModel) {
                 ScreenRoute.IMAGEN,
                 ScreenRoute.VEO,
                 ScreenRoute.VOICEOVER,
-                ScreenRoute.WRITER
+                ScreenRoute.CREATOR
             )
+
+            val mainRoutes = listOf(
+                ScreenRoute.CREATOR,
+                ScreenRoute.WRITER,
+                ScreenRoute.VOICEOVER,
+                ScreenRoute.VIDEO_EDITOR,
+                ScreenRoute.HISTORY,
+                ScreenRoute.PROFILE
+            )
+
+            val isSwipeable = currentRoute in mainRoutes
+            val swipeModifier = if (isSwipeable) {
+                Modifier.pointerInput(currentRoute) {
+                    var totalDrag = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { totalDrag = 0f },
+                        onDragEnd = {
+                            val currentIndex = mainRoutes.indexOf(currentRoute)
+                            if (currentIndex != -1) {
+                                if (totalDrag < -150f) {
+                                    // Swipe left -> go next (next tab)
+                                    val nextIndex = (currentIndex + 1) % mainRoutes.size
+                                    currentRoute = mainRoutes[nextIndex]
+                                } else if (totalDrag > 150f) {
+                                    // Swipe right -> go previous (previous tab)
+                                    val prevIndex = (currentIndex - 1 + mainRoutes.size) % mainRoutes.size
+                                    currentRoute = mainRoutes[prevIndex]
+                                }
+                            }
+                        },
+                        onDragCancel = { totalDrag = 0f },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            totalDrag += dragAmount
+                        }
+                    )
+                }
+            } else {
+                Modifier
+            }
 
             BoxWithConstraints(
                 modifier = Modifier
@@ -261,6 +288,7 @@ fun MainApp(viewModel: MainViewModel) {
                         top = padding.calculateTopPadding(),
                         bottom = padding.calculateBottomPadding()
                     )
+                    .then(swipeModifier)
             ) {
                 val isWide = maxWidth >= 600.dp
 
@@ -418,8 +446,7 @@ fun StudioTopNavigation(
     val items = listOf(
         StudioNavItem("Images", ScreenRoute.IMAGEN, Icons.Default.Image),
         StudioNavItem("Videos", ScreenRoute.VEO, Icons.Default.Movie),
-        StudioNavItem("Voiceover", ScreenRoute.VOICEOVER, Icons.Default.Mic),
-        StudioNavItem("Writing", ScreenRoute.WRITER, Icons.Default.ChatBubble)
+        StudioNavItem("Creative", ScreenRoute.CREATOR, Icons.Default.Lightbulb)
     )
 
     Surface(
@@ -491,8 +518,7 @@ fun StudioSidebar(
     val items = listOf(
         StudioNavItem("Images", ScreenRoute.IMAGEN, Icons.Default.Image),
         StudioNavItem("Videos", ScreenRoute.VEO, Icons.Default.Movie),
-        StudioNavItem("Voiceover", ScreenRoute.VOICEOVER, Icons.Default.Mic),
-        StudioNavItem("Writing", ScreenRoute.WRITER, Icons.Default.ChatBubble)
+        StudioNavItem("Creative", ScreenRoute.CREATOR, Icons.Default.Lightbulb)
     )
 
     NavigationRail(

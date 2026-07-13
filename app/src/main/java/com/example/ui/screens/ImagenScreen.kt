@@ -2,6 +2,11 @@ package com.example.ui.screens
 
 import android.graphics.BitmapFactory
 import android.util.Base64
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -38,6 +43,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.data.database.VisionAiCreation
 import com.example.ui.MainViewModel
 import com.example.ui.components.ToolInputProcessingOverlay
+import com.example.ui.components.DownloadSettingsDialog
+import com.example.ui.components.VideoPanelSkeleton
 import com.example.ui.theme.NovaGradient
 import com.example.ui.theme.NovaPrimary
 import com.example.ui.theme.NovaSecondary
@@ -60,12 +67,40 @@ fun ImagenScreen(
 
     var prompt by remember { mutableStateOf("") }
     var selectedStyle by remember { mutableStateOf("Cinematic") }
+
+    var selectedMediaUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedMediaName by remember { mutableStateOf<String?>(null) }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            selectedMediaUri = uri
+            selectedMediaName = uri.lastPathSegment ?: "Selected File"
+            Toast.makeText(context, "File selected: $selectedMediaName", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val speechRecognizerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val data = result.data
+            val results = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            if (!results.isNullOrEmpty()) {
+                val spokenText = results[0]
+                prompt = if (prompt.isBlank()) spokenText else "$prompt $spokenText"
+                Toast.makeText(context, "Voice input appended!", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
     var selectedRatio by remember { mutableStateOf("1:1") }
     var selectedSize by remember { mutableStateOf("1K") }
-    var selectedModel by remember { mutableStateOf("gemini-2.5-flash-image") } // or gemini-3.1-flash-image-preview
+    var selectedModel by remember { mutableStateOf("gemini-3.1-flash-image-preview") } // or gemini-3-pro-image-preview
 
     var generatedCreation by remember { mutableStateOf<VisionAiCreation?>(null) }
     var showFullscreenDialog by remember { mutableStateOf(false) }
+    var showDownloadDialog by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
 
@@ -160,56 +195,51 @@ fun ImagenScreen(
                 contentAlignment = Alignment.Center
             ) {
                 if (isGenerating) {
-                    // Shimmering Glowing Loading State
-                    val infiniteTransition = rememberInfiniteTransition(label = "generating_glow")
-                    val ringRotation by infiniteTransition.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 360f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(1500, easing = LinearEasing),
-                            repeatMode = RepeatMode.Restart
-                        ),
-                        label = "angle"
-                    )
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        // Shimmering placeholder skeleton
+                        VideoPanelSkeleton(modifier = Modifier.fillMaxSize())
 
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier.padding(24.dp)
-                    ) {
-                        Box(
+                        // Glowing Progress Indicator & Step Details
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
                             modifier = Modifier
-                                .size(80.dp)
-                                .scale(1.1f),
-                            contentAlignment = Alignment.Center
+                                .align(Alignment.Center)
+                                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
+                                .padding(16.dp)
                         ) {
-                            CircularProgressIndicator(
-                                progress = { progress },
-                                color = NovaPrimary,
-                                strokeWidth = 4.dp,
-                                modifier = Modifier.fillMaxSize()
+                            Box(
+                                modifier = Modifier.size(60.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    progress = { progress },
+                                    color = NovaPrimary,
+                                    strokeWidth = 3.5.dp,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.AutoAwesome,
+                                    contentDescription = "Generating",
+                                    tint = NovaSecondary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = progressStep,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                textAlign = TextAlign.Center
                             )
-                            Icon(
-                                imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = "Generating",
-                                tint = NovaSecondary,
-                                modifier = Modifier.size(32.dp)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "${(progress * 100).toInt()}% Completed",
+                                fontSize = 11.sp,
+                                color = Color.White.copy(alpha = 0.8f)
                             )
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = progressStep,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "${(progress * 100).toInt()}% Completed",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                        )
                     }
                 } else if (displayBitmap != null && generatedCreation != null) {
                     // Generated Output Preview
@@ -346,7 +376,7 @@ fun ImagenScreen(
 
                     Button(
                         onClick = {
-                            Toast.makeText(context, "Saved successfully to local gallery!", Toast.LENGTH_SHORT).show()
+                            showDownloadDialog = true
                         },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -357,7 +387,7 @@ fun ImagenScreen(
                     ) {
                         Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Download 4K", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("Download Image", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -389,6 +419,43 @@ fun ImagenScreen(
                                     fontSize = 12.sp
                                 )
                             },
+                            trailingIcon = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(end = 4.dp)
+                                ) {
+                                    IconButton(
+                                        onClick = {
+                                            filePickerLauncher.launch("*/*")
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = "Upload files image video",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            try {
+                                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                                                }
+                                                speechRecognizerLauncher.launch(intent)
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Speech recognition not supported on this device", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Mic,
+                                            contentDescription = "Speech recognition",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(100.dp)
@@ -401,6 +468,36 @@ fun ImagenScreen(
                                 unfocusedContainerColor = Color.Transparent
                             )
                         )
+
+                        selectedMediaUri?.let { uri ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                Text(
+                                    text = "Attached: $selectedMediaName",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                IconButton(
+                                    onClick = {
+                                        selectedMediaUri = null
+                                        selectedMediaName = null
+                                    },
+                                    modifier = Modifier.size(16.dp)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remove media", modifier = Modifier.size(12.dp))
+                                }
+                            }
+                        }
 
                         // Quick prompt presets
                         Row(
@@ -467,8 +564,8 @@ fun ImagenScreen(
                             horizontalArrangement = Arrangement.SpaceAround
                         ) {
                             listOf(
-                                "gemini-2.5-flash-image" to "Imagen 3 (Fast)",
-                                "gemini-3.1-flash-image-preview" to "Imagen 3 Pro (High Quality)"
+                                "gemini-3.1-flash-image-preview" to "Imagen 3 (Fast)",
+                                "gemini-3-pro-image-preview" to "Imagen 3 Pro (HQ)"
                             ).forEach { (modelKey, label) ->
                                 val isSelected = selectedModel == modelKey
                                 Text(
@@ -695,5 +792,15 @@ fun ImagenScreen(
                 }
             }
         }
+    }
+
+    if (showDownloadDialog) {
+        DownloadSettingsDialog(
+            mediaType = "IMAGE",
+            onDismissRequest = { showDownloadDialog = false },
+            onConfirmDownload = { format, quality, includeMetadata ->
+                Toast.makeText(context, "Downloaded image in $format ($quality)!", Toast.LENGTH_LONG).show()
+            }
+        )
     }
 }

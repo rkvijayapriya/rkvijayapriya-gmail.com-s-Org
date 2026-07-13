@@ -1,5 +1,10 @@
 package com.example.ui.screens
 
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
@@ -52,6 +57,34 @@ fun HistoryScreen(
     val creations by viewModel.allCreations.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
+
+    var selectedMediaUriSearch by remember { mutableStateOf<Uri?>(null) }
+    var selectedMediaNameSearch by remember { mutableStateOf<String?>(null) }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val fName = uri.lastPathSegment ?: "Selected File"
+            selectedMediaUriSearch = uri
+            selectedMediaNameSearch = fName
+            Toast.makeText(context, "File selected: $fName", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val speechRecognizerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val data = result.data
+            val results = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            if (!results.isNullOrEmpty()) {
+                val spokenText = results[0]
+                searchQuery = if (searchQuery.isBlank()) spokenText else "$searchQuery $spokenText"
+                Toast.makeText(context, "Voice input appended!", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
     var selectedFilter by remember { mutableStateOf("ALL") } // ALL, VIDEO, IMAGE, VOICEOVER, WRITING
 
     // Filtered list
@@ -140,13 +173,55 @@ fun HistoryScreen(
                 shape = RoundedCornerShape(24.dp),
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
+                        IconButton(onClick = { filePickerLauncher.launch("*/*") }) {
+                            Icon(Icons.Default.Add, contentDescription = "Add Attachment", tint = MaterialTheme.colorScheme.primary)
+                        }
+                        IconButton(onClick = {
+                            try {
+                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                                }
+                                speechRecognizerLauncher.launch(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Speech recognition not supported on this device", Toast.LENGTH_SHORT).show()
+                            }
+                        }) {
+                            Icon(Icons.Default.Mic, contentDescription = "Speak text", tint = MaterialTheme.colorScheme.primary)
+                        }
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }
             )
+
+            selectedMediaUriSearch?.let { uri ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text(
+                        text = "Attached: $selectedMediaNameSearch",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    IconButton(onClick = { selectedMediaUriSearch = null; selectedMediaNameSearch = null }, modifier = Modifier.size(16.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(12.dp))
+                    }
+                }
+            }
 
             // Category Filter Row
             Row(

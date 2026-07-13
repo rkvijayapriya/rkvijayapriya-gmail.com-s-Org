@@ -42,6 +42,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.MainViewModel
@@ -64,6 +68,7 @@ fun WelcomeScreen(
     val density = LocalDensity.current.density
 
     var showLanguageSheet by remember { mutableStateOf(false) }
+    val pagerState = rememberPagerState(pageCount = { 2 })
 
     val greetingMap = remember {
         mapOf(
@@ -318,428 +323,622 @@ fun WelcomeScreen(
                 }
             }
 
-            // Lica Virtual Avatar & Hologram Component - With Interactive Drag-to-Rotate 3D gesture controls!
-            Box(
+            // Swipe-able 3D Showcase Pager
+            HorizontalPager(
+                state = pagerState,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(300.dp)
-                    .scale(breathingScale)
-                    .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                userDragX = (userDragX + dragAmount.x).coerceIn(-180f, 180f)
-                                userDragY = (userDragY + dragAmount.y).coerceIn(-180f, 180f)
+                    .testTag("welcome_showcase_pager")
+            ) { pageIndex ->
+                if (pageIndex == 0) {
+                    // PAGE 0: Lica Virtual Avatar & Hologram Component - With Interactive Drag-to-Rotate 3D gesture controls!
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .scale(breathingScale)
+                            .pointerInput(Unit) {
+                                detectDragGestures(
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        userDragX = (userDragX + dragAmount.x).coerceIn(-180f, 180f)
+                                        userDragY = (userDragY + dragAmount.y).coerceIn(-180f, 180f)
+                                    },
+                                    onDragEnd = {
+                                        userDragX = 0f
+                                        userDragY = 0f
+                                    },
+                                    onDragCancel = {
+                                        userDragX = 0f
+                                        userDragY = 0f
+                                    }
+                                )
                             },
-                            onDragEnd = {
-                                userDragX = 0f
-                                userDragY = 0f
-                            },
-                            onDragCancel = {
-                                userDragX = 0f
-                                userDragY = 0f
-                            }
-                        )
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                // Background futuristic radar screen or circular halo rings - parallax background (rotates slower)
-                Canvas(
-                    modifier = Modifier
-                        .size(260.dp)
-                        .graphicsLayer {
-                            rotationX = totalRotationX * 0.4f
-                            rotationY = totalRotationY * 0.4f
-                            cameraDistance = 12f * density
-                        }
-                ) {
-                    // Draw outer tech circle grid
-                    drawCircle(
-                        color = NovaPrimary.copy(alpha = 0.1f),
-                        radius = size.minDimension / 2,
-                        style = Stroke(width = 1.dp.toPx())
-                    )
-                    drawCircle(
-                        color = NovaSecondary.copy(alpha = 0.05f),
-                        radius = size.minDimension / 2.5f,
-                        style = Stroke(width = 1.dp.toPx())
-                    )
-                    
-                    // Rotating outer dashed ring
-                    drawArc(
-                        brush = Brush.sweepGradient(listOf(NovaPrimary, NovaSecondary, NovaTertiary, NovaPrimary)),
-                        startAngle = rotationAngle,
-                        sweepAngle = 270f,
-                        useCenter = false,
-                        style = Stroke(
-                            width = 2.dp.toPx(),
-                            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
-                                floatArrayOf(20f, 15f), 0f
-                            )
-                        )
-                    )
-                }
-
-                // Interactive 3D/Anime Cyber-goddess drawing - fully tilted in 3D perspective
-                Canvas(
-                    modifier = Modifier
-                        .size(240.dp)
-                        .testTag("lica_avatar_canvas")
-                        .graphicsLayer {
-                            rotationX = totalRotationX
-                            rotationY = totalRotationY
-                            cameraDistance = 12f * density
-                        }
-                ) {
-                    val width = size.width
-                    val height = size.height
-                    val cx = width / 2f
-                    val cy = height / 2f
-
-                    // Organic breathing calculations for lifelike physical coords
-                    // breathYOffset animates the up/down motion of the torso/chest (e.g. -6dp to +6dp)
-                    val breathYOffset = (breathingScale - 1f) * 6.dp.toPx()
-                    // headYOffset animates the slightly delayed or dampened up/down head bobbing (e.g. -4.5dp to +4.5dp)
-                    val headYOffset = (breathingScale - 1f) * 4.5f.dp.toPx()
-                    // breathChestScale animates the breathing expansion of the chest/torso ribcage
-                    val breathChestScale = 1f + (breathingScale - 1f) * 0.35f
-
-                    // 1. Draw flowing silver/white back hair
-                    val backHairPath = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(cx - 50.dp.toPx(), cy - 20.dp.toPx() + headYOffset)
-                        quadraticTo(cx - 75.dp.toPx(), cy + 20.dp.toPx() + headYOffset, cx - 60.dp.toPx(), height - 20.dp.toPx())
-                        lineTo(cx + 60.dp.toPx(), height - 20.dp.toPx())
-                        quadraticTo(cx + 75.dp.toPx(), cy + 20.dp.toPx() + headYOffset, cx + 50.dp.toPx(), cy - 20.dp.toPx() + headYOffset)
-                        close()
-                    }
-                    drawPath(
-                        path = backHairPath,
-                        brush = Brush.verticalGradient(
-                            colors = listOf(Color(0xFFE2E2E9), Color(0xFF9E9EAC))
-                        )
-                    )
-
-                    // 2. Draw neck - naturally stretches & compresses as head and torso move at slightly different offsets
-                    val neckPath = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(cx - 14.dp.toPx(), cy + 20.dp.toPx() + headYOffset)
-                        lineTo(cx + 14.dp.toPx(), cy + 20.dp.toPx() + headYOffset)
-                        lineTo(cx + 10.dp.toPx(), cy + 45.dp.toPx() + breathYOffset)
-                        lineTo(cx - 10.dp.toPx(), cy + 45.dp.toPx() + breathYOffset)
-                        close()
-                    }
-                    drawPath(
-                        path = neckPath,
-                        color = Color(0xFFFCDAC3) // Peach neck skin
-                    )
-
-                    // 3. Draw sleek white and blue high-tech chest / torso (cybernetic armor) with organic expansion
-                    val torsoPath = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(cx - 30.dp.toPx() * breathChestScale, cy + 45.dp.toPx() + breathYOffset)
-                        quadraticTo(cx - 50.dp.toPx() * breathChestScale, cy + 55.dp.toPx() + breathYOffset, cx - 55.dp.toPx() * breathChestScale, height)
-                        lineTo(cx + 55.dp.toPx() * breathChestScale, height)
-                        quadraticTo(cx + 50.dp.toPx() * breathChestScale, cy + 55.dp.toPx() + breathYOffset, cx + 30.dp.toPx() * breathChestScale, cy + 45.dp.toPx() + breathYOffset)
-                        close()
-                    }
-                    drawPath(
-                        path = torsoPath,
-                        brush = Brush.verticalGradient(
-                            colors = listOf(Color(0xFFF2F4F7), Color(0xFFD0D5DD))
-                        )
-                    )
-
-                    // Draw chest armor details / glowing blue lines
-                    val cyberLeftLine = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(cx - 15.dp.toPx() * breathChestScale, cy + 47.dp.toPx() + breathYOffset)
-                        lineTo(cx - 35.dp.toPx() * breathChestScale, cy + 65.dp.toPx() + breathYOffset)
-                        lineTo(cx - 40.dp.toPx() * breathChestScale, height)
-                    }
-                    drawPath(
-                        path = cyberLeftLine,
-                        color = NovaPrimary,
-                        style = Stroke(width = 3.dp.toPx())
-                    )
-                    
-                    val cyberRightLine = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(cx + 15.dp.toPx() * breathChestScale, cy + 47.dp.toPx() + breathYOffset)
-                        lineTo(cx + 35.dp.toPx() * breathChestScale, cy + 65.dp.toPx() + breathYOffset)
-                        lineTo(cx + 40.dp.toPx() * breathChestScale, height)
-                    }
-                    drawPath(
-                        path = cyberRightLine,
-                        color = NovaPrimary,
-                        style = Stroke(width = 3.dp.toPx())
-                    )
-
-                    // Pulsing Glowing Cybernetic AI Chest Core moving in rhythm
-                    val coreCenterY = cy + 75.dp.toPx() + breathYOffset
-                    drawCircle(
-                        color = NovaSecondary.copy(alpha = 0.3f * coreGlowScale),
-                        radius = 16.dp.toPx() * coreGlowScale,
-                        center = androidx.compose.ui.geometry.Offset(cx, coreCenterY)
-                    )
-                    drawCircle(
-                        color = NovaSecondary,
-                        radius = 10.dp.toPx(),
-                        center = androidx.compose.ui.geometry.Offset(cx, coreCenterY)
-                    )
-                    drawCircle(
-                        color = Color.White,
-                        radius = 4.dp.toPx(),
-                        center = androidx.compose.ui.geometry.Offset(cx, coreCenterY)
-                    )
-
-                    // 4. Draw face plate with 3D directional radial light source gradient shading
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(Color(0xFFFFF1E6), Color(0xFFFCDAC3), Color(0xFFEAAFA1)),
-                            center = androidx.compose.ui.geometry.Offset(cx + 12.dp.toPx(), cy - 22.dp.toPx() + headYOffset),
-                            radius = 50.dp.toPx()
-                        ),
-                        radius = 42.dp.toPx(),
-                        center = androidx.compose.ui.geometry.Offset(cx, cy - 10.dp.toPx() + headYOffset)
-                    )
-
-                    // 5. Draw flowing silver/white side bangs
-                    val leftBang = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(cx - 40.dp.toPx(), cy - 40.dp.toPx() + headYOffset)
-                        quadraticTo(cx - 50.dp.toPx(), cy - 10.dp.toPx() + headYOffset, cx - 36.dp.toPx(), cy + 15.dp.toPx() + headYOffset)
-                        quadraticTo(cx - 30.dp.toPx(), cy - 10.dp.toPx() + headYOffset, cx - 32.dp.toPx(), cy - 35.dp.toPx() + headYOffset)
-                        close()
-                    }
-                    drawPath(
-                        path = leftBang,
-                        brush = Brush.verticalGradient(
-                            colors = listOf(Color.White, Color(0xFFB0B0C4))
-                        )
-                    )
-
-                    val rightBang = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(cx + 40.dp.toPx(), cy - 40.dp.toPx() + headYOffset)
-                        quadraticTo(cx + 50.dp.toPx(), cy - 10.dp.toPx() + headYOffset, cx + 36.dp.toPx(), cy + 15.dp.toPx() + headYOffset)
-                        quadraticTo(cx + 30.dp.toPx(), cy - 10.dp.toPx() + headYOffset, cx + 32.dp.toPx(), cy - 35.dp.toPx() + headYOffset)
-                        close()
-                    }
-                    drawPath(
-                        path = rightBang,
-                        brush = Brush.verticalGradient(
-                            colors = listOf(Color.White, Color(0xFFB0B0C4))
-                        )
-                    )
-
-                    // Silver front fringe hair strands
-                    val fringePath = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(cx - 35.dp.toPx(), cy - 45.dp.toPx() + headYOffset)
-                        quadraticTo(cx - 15.dp.toPx(), cy - 25.dp.toPx() + headYOffset, cx - 8.dp.toPx(), cy - 22.dp.toPx() + headYOffset)
-                        quadraticTo(cx + 15.dp.toPx(), cy - 30.dp.toPx() + headYOffset, cx + 35.dp.toPx(), cy - 45.dp.toPx() + headYOffset)
-                        quadraticTo(cx, cy - 48.dp.toPx() + headYOffset, cx - 35.dp.toPx(), cy - 45.dp.toPx() + headYOffset)
-                        close()
-                    }
-                    drawPath(fringePath, brush = Brush.verticalGradient(colors = listOf(Color.White, Color(0xFFDCE1E7))))
-
-                    // 6. Draw bright glowing blue anime eyes
-                    val isBlinking = (System.currentTimeMillis() / 2500) % 2 == 0L
-                    val eyeRadiusY = if (isBlinking) 1.dp.toPx() else 8.dp.toPx()
-                    val eyeRadiusX = 6.dp.toPx()
-                    
-                    // Left Eye background & iris
-                    val leftEyeCenterY = cy - 20.dp.toPx() + headYOffset
-                    drawOval(
-                        color = Color(0xFF030114),
-                        topLeft = androidx.compose.ui.geometry.Offset(cx - 20.dp.toPx() - eyeRadiusX, leftEyeCenterY - eyeRadiusY),
-                        size = androidx.compose.ui.geometry.Size(eyeRadiusX * 2, eyeRadiusY * 2)
-                    )
-                    if (!isBlinking) {
-                        drawCircle(
-                            color = NovaSecondary,
-                            radius = 5.dp.toPx(),
-                            center = androidx.compose.ui.geometry.Offset(cx - 20.dp.toPx(), leftEyeCenterY)
-                        )
-                        drawCircle(
-                            color = Color.White,
-                            radius = 2.dp.toPx(),
-                            center = androidx.compose.ui.geometry.Offset(cx - 22.dp.toPx(), leftEyeCenterY - 2.dp.toPx()) // pupil reflection
-                        )
-                    }
-
-                    // Right Eye background & iris
-                    val rightEyeCenterY = cy - 20.dp.toPx() + headYOffset
-                    drawOval(
-                        color = Color(0xFF030114),
-                        topLeft = androidx.compose.ui.geometry.Offset(cx + 20.dp.toPx() - eyeRadiusX, rightEyeCenterY - eyeRadiusY),
-                        size = androidx.compose.ui.geometry.Size(eyeRadiusX * 2, eyeRadiusY * 2)
-                    )
-                    if (!isBlinking) {
-                        drawCircle(
-                            color = NovaSecondary,
-                            radius = 5.dp.toPx(),
-                            center = androidx.compose.ui.geometry.Offset(cx + 20.dp.toPx(), rightEyeCenterY)
-                        )
-                        drawCircle(
-                            color = Color.White,
-                            radius = 2.dp.toPx(),
-                            center = androidx.compose.ui.geometry.Offset(cx + 18.dp.toPx(), rightEyeCenterY - 2.dp.toPx()) // pupil reflection
-                        )
-                    }
-
-                    // 7. Blush cheeks
-                    drawCircle(
-                        color = Color(0xFFFF5252).copy(alpha = 0.35f),
-                        radius = 5.dp.toPx(),
-                        center = androidx.compose.ui.geometry.Offset(cx - 24.dp.toPx(), cy - 8.dp.toPx() + headYOffset)
-                    )
-                    drawCircle(
-                        color = Color(0xFFFF5252).copy(alpha = 0.35f),
-                        radius = 5.dp.toPx(),
-                        center = androidx.compose.ui.geometry.Offset(cx + 24.dp.toPx(), cy - 8.dp.toPx() + headYOffset)
-                    )
-
-                    // 8. Animated speaking mouth
-                    val talkingHeight = if (isLicaSpeaking) mouthHeight.dp.toPx() * 0.6f else 2.dp.toPx()
-                    drawOval(
-                        color = NovaTertiary,
-                        topLeft = androidx.compose.ui.geometry.Offset(cx - 6.dp.toPx(), cy - 2.dp.toPx() + headYOffset),
-                        size = androidx.compose.ui.geometry.Size(12.dp.toPx(), talkingHeight)
-                    )
-
-                    // 9. Interactive Waving Cyber-Hand moving in sync with body & shoulder
-                    rotate(degrees = handWavingAngle, pivot = androidx.compose.ui.geometry.Offset(cx - 55.dp.toPx(), cy + 60.dp.toPx() + breathYOffset)) {
-                        // Drawing arm/shoulder sleeve
-                        val forearm = androidx.compose.ui.graphics.Path().apply {
-                            moveTo(cx - 55.dp.toPx(), cy + 60.dp.toPx() + breathYOffset)
-                            lineTo(cx - 65.dp.toPx(), cy + 10.dp.toPx() + headYOffset)
-                            lineTo(cx - 80.dp.toPx(), cy + 15.dp.toPx() + headYOffset)
-                            lineTo(cx - 65.dp.toPx(), cy + 70.dp.toPx() + breathYOffset)
-                            close()
-                        }
-                        drawPath(forearm, color = Color(0xFFECEFF1))
-                        
-                        // Cyber-glove hand
-                        val handCenterX = cx - 68.dp.toPx()
-                        val handCenterY = cy + 10.dp.toPx() + headYOffset
-                        drawCircle(
-                            color = Color(0xFF37474F), // dark gray cyber glove
-                            radius = 12.dp.toPx(),
-                            center = androidx.compose.ui.geometry.Offset(handCenterX, handCenterY)
-                        )
-                        // Glove fingers waving
-                        for (i in 0..4) {
-                            val fingerAngle = Math.toRadians((i * 20 - 40).toDouble())
-                            val fx = (handCenterX + Math.sin(fingerAngle) * 18.dp.toPx()).toFloat()
-                            val fy = (handCenterY - Math.cos(fingerAngle) * 18.dp.toPx()).toFloat()
-                            drawLine(
-                                color = Color(0xFF78909C),
-                                start = androidx.compose.ui.geometry.Offset(handCenterX, handCenterY),
-                                end = androidx.compose.ui.geometry.Offset(fx, fy),
-                                strokeWidth = 3.dp.toPx(),
-                                cap = androidx.compose.ui.graphics.StrokeCap.Round
-                            )
-                        }
-                        // Glowing cyan circle in the palm (sensor)
-                        drawCircle(
-                            color = NovaSecondary,
-                            radius = 4.dp.toPx(),
-                            center = androidx.compose.ui.geometry.Offset(handCenterX, handCenterY)
-                        )
-                        drawCircle(
-                            color = NovaSecondary.copy(alpha = 0.5f),
-                            radius = 7.dp.toPx(),
-                            center = androidx.compose.ui.geometry.Offset(handCenterX, handCenterY)
-                        )
-                    }
-
-                    // 9.5 Futuristic Holographic Laser Scanner Line Sweep Overlay
-                    val laserY = height * scanLineY
-                    drawLine(
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                NovaSecondary.copy(alpha = 0.15f),
-                                NovaSecondary,
-                                Color.White,
-                                NovaSecondary,
-                                NovaSecondary.copy(alpha = 0.15f),
-                                Color.Transparent
-                            )
-                        ),
-                        start = androidx.compose.ui.geometry.Offset(0f, laserY),
-                        end = androidx.compose.ui.geometry.Offset(width, laserY),
-                        strokeWidth = 3.dp.toPx()
-                    )
-                    
-                    // Soft laser ambient glow below scanner line
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                NovaSecondary.copy(alpha = 0.08f),
-                                Color.Transparent
-                            )
-                        ),
-                        topLeft = androidx.compose.ui.geometry.Offset(0f, laserY),
-                        size = androidx.compose.ui.geometry.Size(width, 24.dp.toPx())
-                    )
-                }
-
-                // 10. Floating Holographic Glass Screen saying:
-                // "Hi, I am LICA Your AI Creative Assistant" - parallax floating layer (rotates mid-speed)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 10.dp, end = 12.dp)
-                        .offset(y = hologramFloat.dp)
-                        .width(135.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0x3300FFFF)) // transparent cyan glass
-                        .border(
-                            1.5.dp,
-                            Brush.linearGradient(
-                                colors = listOf(NovaSecondary, NovaSecondary.copy(alpha = 0.1f))
-                            ),
-                            RoundedCornerShape(16.dp)
-                        )
-                        .graphicsLayer {
-                            rotationX = totalRotationX * 0.7f
-                            rotationY = totalRotationY * 0.7f
-                            cameraDistance = 12f * density
-                        }
-                        .padding(10.dp)
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "Hi, I am",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White.copy(alpha = 0.9f)
-                        )
-                        Text(
-                            text = "LICA",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Black,
-                            color = NovaSecondary,
-                            letterSpacing = 1.sp
-                        )
-                        Text(
-                            text = "Your AI Creative\nAssistant",
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.75f),
-                            textAlign = TextAlign.Center,
-                            lineHeight = 11.sp
+                        // Background futuristic radar screen or circular halo rings - parallax background (rotates slower)
+                        Canvas(
+                            modifier = Modifier
+                                .size(260.dp)
+                                .graphicsLayer {
+                                    rotationX = totalRotationX * 0.4f
+                                    rotationY = totalRotationY * 0.4f
+                                    cameraDistance = 12f * density
+                                }
+                        ) {
+                            // Draw outer tech circle grid
+                            drawCircle(
+                                color = NovaPrimary.copy(alpha = 0.1f),
+                                radius = size.minDimension / 2,
+                                style = Stroke(width = 1.dp.toPx())
+                            )
+                            drawCircle(
+                                color = NovaSecondary.copy(alpha = 0.05f),
+                                radius = size.minDimension / 2.5f,
+                                style = Stroke(width = 1.dp.toPx())
+                            )
+                            
+                            // Rotating outer dashed ring
+                            drawArc(
+                                brush = Brush.sweepGradient(listOf(NovaPrimary, NovaSecondary, NovaTertiary, NovaPrimary)),
+                                startAngle = rotationAngle,
+                                sweepAngle = 270f,
+                                useCenter = false,
+                                style = Stroke(
+                                    width = 2.dp.toPx(),
+                                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
+                                        floatArrayOf(20f, 15f), 0f
+                                    )
+                                )
+                            )
+                        }
+
+                        // Interactive 3D/Anime Cyber-goddess drawing - fully tilted in 3D perspective
+                        Canvas(
+                            modifier = Modifier
+                                .size(240.dp)
+                                .testTag("lica_avatar_canvas")
+                                .graphicsLayer {
+                                    rotationX = totalRotationX
+                                    rotationY = totalRotationY
+                                    cameraDistance = 12f * density
+                                }
+                        ) {
+                            val width = size.width
+                            val height = size.height
+                            val cx = width / 2f
+                            val cy = height / 2f
+
+                            // Organic breathing calculations for lifelike physical coords
+                            val breathYOffset = (breathingScale - 1f) * 6.dp.toPx()
+                            val headYOffset = (breathingScale - 1f) * 4.5f.dp.toPx()
+                            val breathChestScale = 1f + (breathingScale - 1f) * 0.35f
+
+                            // 1. Draw flowing silver/white back hair
+                            val backHairPath = androidx.compose.ui.graphics.Path().apply {
+                                moveTo(cx - 50.dp.toPx(), cy - 20.dp.toPx() + headYOffset)
+                                quadraticTo(cx - 75.dp.toPx(), cy + 20.dp.toPx() + headYOffset, cx - 60.dp.toPx(), height - 20.dp.toPx())
+                                lineTo(cx + 60.dp.toPx(), height - 20.dp.toPx())
+                                quadraticTo(cx + 75.dp.toPx(), cy + 20.dp.toPx() + headYOffset, cx + 50.dp.toPx(), cy - 20.dp.toPx() + headYOffset)
+                                close()
+                            }
+                            drawPath(
+                                path = backHairPath,
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(Color(0xFFE2E2E9), Color(0xFF9E9EAC))
+                                )
+                            )
+
+                            // 2. Draw neck
+                            val neckPath = androidx.compose.ui.graphics.Path().apply {
+                                moveTo(cx - 14.dp.toPx(), cy + 20.dp.toPx() + headYOffset)
+                                lineTo(cx + 14.dp.toPx(), cy + 20.dp.toPx() + headYOffset)
+                                lineTo(cx + 10.dp.toPx(), cy + 45.dp.toPx() + breathYOffset)
+                                lineTo(cx - 10.dp.toPx(), cy + 45.dp.toPx() + breathYOffset)
+                                close()
+                            }
+                            drawPath(
+                                path = neckPath,
+                                color = Color(0xFFFCDAC3)
+                            )
+
+                            // 3. Draw sleek white and blue high-tech chest / torso (cybernetic armor) with organic expansion
+                            val torsoPath = androidx.compose.ui.graphics.Path().apply {
+                                moveTo(cx - 30.dp.toPx() * breathChestScale, cy + 45.dp.toPx() + breathYOffset)
+                                quadraticTo(cx - 50.dp.toPx() * breathChestScale, cy + 55.dp.toPx() + breathYOffset, cx - 55.dp.toPx() * breathChestScale, height)
+                                lineTo(cx + 55.dp.toPx() * breathChestScale, height)
+                                quadraticTo(cx + 50.dp.toPx() * breathChestScale, cy + 55.dp.toPx() + breathYOffset, cx + 30.dp.toPx() * breathChestScale, cy + 45.dp.toPx() + breathYOffset)
+                                close()
+                            }
+                            drawPath(
+                                path = torsoPath,
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(Color(0xFFF2F4F7), Color(0xFFD0D5DD))
+                                )
+                            )
+
+                            // Draw chest armor details / glowing blue lines
+                            val cyberLeftLine = androidx.compose.ui.graphics.Path().apply {
+                                moveTo(cx - 15.dp.toPx() * breathChestScale, cy + 47.dp.toPx() + breathYOffset)
+                                lineTo(cx - 35.dp.toPx() * breathChestScale, cy + 65.dp.toPx() + breathYOffset)
+                                lineTo(cx - 40.dp.toPx() * breathChestScale, height)
+                            }
+                            drawPath(
+                                path = cyberLeftLine,
+                                color = NovaPrimary,
+                                style = Stroke(width = 3.dp.toPx())
+                            )
+                            
+                            val cyberRightLine = androidx.compose.ui.graphics.Path().apply {
+                                moveTo(cx + 15.dp.toPx() * breathChestScale, cy + 47.dp.toPx() + breathYOffset)
+                                lineTo(cx + 35.dp.toPx() * breathChestScale, cy + 65.dp.toPx() + breathYOffset)
+                                lineTo(cx + 40.dp.toPx() * breathChestScale, height)
+                            }
+                            drawPath(
+                                path = cyberRightLine,
+                                color = NovaPrimary,
+                                style = Stroke(width = 3.dp.toPx())
+                            )
+
+                            // Pulsing Glowing Cybernetic AI Chest Core moving in rhythm
+                            val coreCenterY = cy + 75.dp.toPx() + breathYOffset
+                            drawCircle(
+                                color = NovaSecondary.copy(alpha = 0.3f * coreGlowScale),
+                                radius = 16.dp.toPx() * coreGlowScale,
+                                center = androidx.compose.ui.geometry.Offset(cx, coreCenterY)
+                            )
+                            drawCircle(
+                                color = NovaSecondary,
+                                radius = 10.dp.toPx(),
+                                center = androidx.compose.ui.geometry.Offset(cx, coreCenterY)
+                            )
+                            drawCircle(
+                                color = Color.White,
+                                radius = 4.dp.toPx(),
+                                center = androidx.compose.ui.geometry.Offset(cx, coreCenterY)
+                            )
+
+                            // 4. Draw face plate
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(Color(0xFFFFF1E6), Color(0xFFFCDAC3), Color(0xFFEAAFA1)),
+                                    center = androidx.compose.ui.geometry.Offset(cx + 12.dp.toPx(), cy - 22.dp.toPx() + headYOffset),
+                                    radius = 50.dp.toPx()
+                                ),
+                                radius = 42.dp.toPx(),
+                                center = androidx.compose.ui.geometry.Offset(cx, cy - 10.dp.toPx() + headYOffset)
+                            )
+
+                            // 5. Draw flowing silver/white side bangs
+                            val leftBang = androidx.compose.ui.graphics.Path().apply {
+                                moveTo(cx - 40.dp.toPx(), cy - 40.dp.toPx() + headYOffset)
+                                quadraticTo(cx - 50.dp.toPx(), cy - 10.dp.toPx() + headYOffset, cx - 36.dp.toPx(), cy + 15.dp.toPx() + headYOffset)
+                                quadraticTo(cx - 30.dp.toPx(), cy - 10.dp.toPx() + headYOffset, cx - 32.dp.toPx(), cy - 35.dp.toPx() + headYOffset)
+                                close()
+                            }
+                            drawPath(
+                                path = leftBang,
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(Color.White, Color(0xFFB0B0C4))
+                                )
+                            )
+
+                            val rightBang = androidx.compose.ui.graphics.Path().apply {
+                                moveTo(cx + 40.dp.toPx(), cy - 40.dp.toPx() + headYOffset)
+                                quadraticTo(cx + 50.dp.toPx(), cy - 10.dp.toPx() + headYOffset, cx + 36.dp.toPx(), cy + 15.dp.toPx() + headYOffset)
+                                quadraticTo(cx + 30.dp.toPx(), cy - 10.dp.toPx() + headYOffset, cx + 32.dp.toPx(), cy - 35.dp.toPx() + headYOffset)
+                                close()
+                            }
+                            drawPath(
+                                path = rightBang,
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(Color.White, Color(0xFFB0B0C4))
+                                )
+                            )
+
+                            // Silver front fringe hair strands
+                            val fringePath = androidx.compose.ui.graphics.Path().apply {
+                                moveTo(cx - 35.dp.toPx(), cy - 45.dp.toPx() + headYOffset)
+                                quadraticTo(cx - 15.dp.toPx(), cy - 25.dp.toPx() + headYOffset, cx - 8.dp.toPx(), cy - 22.dp.toPx() + headYOffset)
+                                quadraticTo(cx + 15.dp.toPx(), cy - 30.dp.toPx() + headYOffset, cx + 35.dp.toPx(), cy - 45.dp.toPx() + headYOffset)
+                                quadraticTo(cx, cy - 48.dp.toPx() + headYOffset, cx - 35.dp.toPx(), cy - 45.dp.toPx() + headYOffset)
+                                close()
+                            }
+                            drawPath(fringePath, brush = Brush.verticalGradient(colors = listOf(Color.White, Color(0xFFDCE1E7))))
+
+                            // 6. Draw bright glowing blue anime eyes
+                            val isBlinking = (System.currentTimeMillis() / 2500) % 2 == 0L
+                            val eyeRadiusY = if (isBlinking) 1.dp.toPx() else 8.dp.toPx()
+                            val eyeRadiusX = 6.dp.toPx()
+                            
+                            // Left Eye background & iris
+                            val leftEyeCenterY = cy - 20.dp.toPx() + headYOffset
+                            drawOval(
+                                color = Color(0xFF030114),
+                                topLeft = androidx.compose.ui.geometry.Offset(cx - 20.dp.toPx() - eyeRadiusX, leftEyeCenterY - eyeRadiusY),
+                                size = androidx.compose.ui.geometry.Size(eyeRadiusX * 2, eyeRadiusY * 2)
+                            )
+                            if (!isBlinking) {
+                                drawCircle(
+                                    color = NovaSecondary,
+                                    radius = 5.dp.toPx(),
+                                    center = androidx.compose.ui.geometry.Offset(cx - 20.dp.toPx(), leftEyeCenterY)
+                                )
+                                drawCircle(
+                                    color = Color.White,
+                                    radius = 2.dp.toPx(),
+                                    center = androidx.compose.ui.geometry.Offset(cx - 22.dp.toPx(), leftEyeCenterY - 2.dp.toPx())
+                                )
+                            }
+
+                            // Right Eye background & iris
+                            val rightEyeCenterY = cy - 20.dp.toPx() + headYOffset
+                            drawOval(
+                                color = Color(0xFF030114),
+                                topLeft = androidx.compose.ui.geometry.Offset(cx + 20.dp.toPx() - eyeRadiusX, rightEyeCenterY - eyeRadiusY),
+                                size = androidx.compose.ui.geometry.Size(eyeRadiusX * 2, eyeRadiusY * 2)
+                            )
+                            if (!isBlinking) {
+                                drawCircle(
+                                    color = NovaSecondary,
+                                    radius = 5.dp.toPx(),
+                                    center = androidx.compose.ui.geometry.Offset(cx + 20.dp.toPx(), rightEyeCenterY)
+                                )
+                                drawCircle(
+                                    color = Color.White,
+                                    radius = 2.dp.toPx(),
+                                    center = androidx.compose.ui.geometry.Offset(cx + 18.dp.toPx(), rightEyeCenterY - 2.dp.toPx())
+                                )
+                            }
+
+                            // 7. Blush cheeks
+                            drawCircle(
+                                color = Color(0xFFFF5252).copy(alpha = 0.35f),
+                                radius = 5.dp.toPx(),
+                                center = androidx.compose.ui.geometry.Offset(cx - 24.dp.toPx(), cy - 8.dp.toPx() + headYOffset)
+                            )
+                            drawCircle(
+                                color = Color(0xFFFF5252).copy(alpha = 0.35f),
+                                radius = 5.dp.toPx(),
+                                center = androidx.compose.ui.geometry.Offset(cx + 24.dp.toPx(), cy - 8.dp.toPx() + headYOffset)
+                            )
+
+                            // 8. Animated speaking mouth
+                            val talkingHeight = if (isLicaSpeaking) mouthHeight.dp.toPx() * 0.6f else 2.dp.toPx()
+                            drawOval(
+                                color = NovaTertiary,
+                                topLeft = androidx.compose.ui.geometry.Offset(cx - 6.dp.toPx(), cy - 2.dp.toPx() + headYOffset),
+                                size = androidx.compose.ui.geometry.Size(12.dp.toPx(), talkingHeight)
+                            )
+
+                            // 9. Interactive Waving Cyber-Hand
+                            rotate(degrees = handWavingAngle, pivot = androidx.compose.ui.geometry.Offset(cx - 55.dp.toPx(), cy + 60.dp.toPx() + breathYOffset)) {
+                                val forearm = androidx.compose.ui.graphics.Path().apply {
+                                    moveTo(cx - 55.dp.toPx(), cy + 60.dp.toPx() + breathYOffset)
+                                    lineTo(cx - 65.dp.toPx(), cy + 10.dp.toPx() + headYOffset)
+                                    lineTo(cx - 80.dp.toPx(), cy + 15.dp.toPx() + headYOffset)
+                                    lineTo(cx - 65.dp.toPx(), cy + 70.dp.toPx() + breathYOffset)
+                                    close()
+                                }
+                                drawPath(forearm, color = Color(0xFFECEFF1))
+                                
+                                val handCenterX = cx - 68.dp.toPx()
+                                val handCenterY = cy + 10.dp.toPx() + headYOffset
+                                drawCircle(
+                                    color = Color(0xFF37474F),
+                                    radius = 12.dp.toPx(),
+                                    center = androidx.compose.ui.geometry.Offset(handCenterX, handCenterY)
+                                )
+                                for (i in 0..4) {
+                                    val fingerAngle = Math.toRadians((i * 20 - 40).toDouble())
+                                    val fx = (handCenterX + Math.sin(fingerAngle) * 18.dp.toPx()).toFloat()
+                                    val fy = (handCenterY - Math.cos(fingerAngle) * 18.dp.toPx()).toFloat()
+                                    drawLine(
+                                        color = Color(0xFF78909C),
+                                        start = androidx.compose.ui.geometry.Offset(handCenterX, handCenterY),
+                                        end = androidx.compose.ui.geometry.Offset(fx, fy),
+                                        strokeWidth = 3.dp.toPx(),
+                                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                                    )
+                                }
+                                drawCircle(
+                                    color = NovaSecondary,
+                                    radius = 4.dp.toPx(),
+                                    center = androidx.compose.ui.geometry.Offset(handCenterX, handCenterY)
+                                )
+                                drawCircle(
+                                    color = NovaSecondary.copy(alpha = 0.5f),
+                                    radius = 7.dp.toPx(),
+                                    center = androidx.compose.ui.geometry.Offset(handCenterX, handCenterY)
+                                )
+                            }
+
+                            // 9.5 Scanner Line Overlay
+                            val laserY = height * scanLineY
+                            drawLine(
+                                brush = Brush.horizontalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        NovaSecondary.copy(alpha = 0.15f),
+                                        NovaSecondary,
+                                        Color.White,
+                                        NovaSecondary,
+                                        NovaSecondary.copy(alpha = 0.15f),
+                                        Color.Transparent
+                                    )
+                                ),
+                                start = androidx.compose.ui.geometry.Offset(0f, laserY),
+                                end = androidx.compose.ui.geometry.Offset(width, laserY),
+                                strokeWidth = 3.dp.toPx()
+                            )
+                            
+                            drawRect(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        NovaSecondary.copy(alpha = 0.08f),
+                                        Color.Transparent
+                                    )
+                                ),
+                                topLeft = androidx.compose.ui.geometry.Offset(0f, laserY),
+                                size = androidx.compose.ui.geometry.Size(width, 24.dp.toPx())
+                            )
+                        }
+
+                        // 10. Floating Holographic Glass Screen
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 10.dp, end = 12.dp)
+                                .offset(y = hologramFloat.dp)
+                                .width(135.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0x3300FFFF))
+                                .border(
+                                    1.5.dp,
+                                    Brush.linearGradient(
+                                        colors = listOf(NovaSecondary, NovaSecondary.copy(alpha = 0.1f))
+                                    ),
+                                    RoundedCornerShape(16.dp)
+                                )
+                                .graphicsLayer {
+                                    rotationX = totalRotationX * 0.7f
+                                    rotationY = totalRotationY * 0.7f
+                                    cameraDistance = 12f * density
+                                }
+                                .padding(10.dp)
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "Hi, I am",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White.copy(alpha = 0.9f)
+                                )
+                                Text(
+                                    text = "LICA",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = NovaSecondary,
+                                    letterSpacing = 1.sp
+                                )
+                                Text(
+                                    text = "Your AI Creative\nAssistant",
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color.White.copy(alpha = 0.75f),
+                                    textAlign = TextAlign.Center,
+                                    lineHeight = 11.sp
+                                )
+                            }
+                        }
+
+                        // pulsing glow behind the hologram
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 80.dp, end = 50.dp)
+                                .size(30.dp)
+                                .background(NovaSecondary.copy(alpha = 0.15f), CircleShape)
                         )
                     }
-                }
+                } else {
+                    // PAGE 1: Nova Core 3D Image Model using 'nova.png' - With Interactive Drag-to-Rotate 3D gesture controls!
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .scale(breathingScale)
+                            .pointerInput(Unit) {
+                                detectDragGestures(
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        userDragX = (userDragX + dragAmount.x).coerceIn(-180f, 180f)
+                                        userDragY = (userDragY + dragAmount.y).coerceIn(-180f, 180f)
+                                    },
+                                    onDragEnd = {
+                                        userDragX = 0f
+                                        userDragY = 0f
+                                    },
+                                    onDragCancel = {
+                                        userDragX = 0f
+                                        userDragY = 0f
+                                    }
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // 3D Shadow projection below the core
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 20.dp)
+                                .width(180.dp)
+                                .height(20.dp)
+                                .background(
+                                    Brush.radialGradient(
+                                        colors = listOf(NovaPrimary.copy(alpha = 0.4f), Color.Transparent)
+                                    )
+                                )
+                        )
 
-                // Small pulsing glow behind the hologram
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 80.dp, end = 50.dp)
-                        .size(30.dp)
-                        .background(NovaSecondary.copy(alpha = 0.15f), CircleShape)
-                )
+                        // Glowing Halo effect in background
+                        Box(
+                            modifier = Modifier
+                                .size(240.dp)
+                                .background(
+                                    Brush.radialGradient(
+                                        colors = listOf(NovaPrimary.copy(alpha = 0.15f * coreGlowScale), Color.Transparent)
+                                    )
+                                )
+                        )
+
+                        // Decorative futuristic tech coordinate lines
+                        Canvas(
+                            modifier = Modifier
+                                .size(250.dp)
+                                .graphicsLayer {
+                                    rotationX = totalRotationX * 0.5f
+                                    rotationY = totalRotationY * 0.5f
+                                    cameraDistance = 12f * density
+                                }
+                        ) {
+                            val strokeWidth = 1.dp.toPx()
+                            drawLine(
+                                color = NovaSecondary.copy(alpha = 0.3f),
+                                start = androidx.compose.ui.geometry.Offset(0f, size.height / 2),
+                                end = androidx.compose.ui.geometry.Offset(size.width, size.height / 2),
+                                strokeWidth = strokeWidth
+                            )
+                            drawLine(
+                                color = NovaSecondary.copy(alpha = 0.3f),
+                                start = androidx.compose.ui.geometry.Offset(size.width / 2, 0f),
+                                end = androidx.compose.ui.geometry.Offset(size.width / 2, size.height),
+                                strokeWidth = strokeWidth
+                            )
+                            
+                            // Concentric tech rings
+                            drawCircle(
+                                color = NovaSecondary.copy(alpha = 0.2f),
+                                radius = size.minDimension / 2,
+                                style = Stroke(
+                                    width = 1.dp.toPx(),
+                                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
+                                        floatArrayOf(15f, 10f), 0f
+                                    )
+                                )
+                            )
+                        }
+
+                        // Outer orbiting metallic shell / ring
+                        Box(
+                            modifier = Modifier
+                                .size(220.dp)
+                                .graphicsLayer {
+                                    rotationX = totalRotationX * 1.2f
+                                    rotationY = totalRotationY * 1.2f
+                                    rotationZ = rotationAngle
+                                    cameraDistance = 12f * density
+                                }
+                                .border(
+                                    2.dp,
+                                    Brush.sweepGradient(
+                                        colors = listOf(NovaPrimary, NovaSecondary, Color.Transparent, NovaSecondary, NovaPrimary)
+                                    ),
+                                    CircleShape
+                                )
+                        )
+
+                        // The core 3D image model (nova.png)
+                        Image(
+                            painter = painterResource(id = com.example.R.drawable.nova),
+                            contentDescription = "Nova 3D Core Model",
+                            modifier = Modifier
+                                .size(160.dp)
+                                .graphicsLayer {
+                                    rotationX = totalRotationX
+                                    rotationY = totalRotationY
+                                    rotationZ = rotationAngle * 0.3f
+                                    cameraDistance = 12f * density
+                                    
+                                    translationX = animatedUserDragX * 0.08f
+                                    translationY = animatedUserDragY * 0.08f
+                                }
+                        )
+
+                        // Inner glowing ring
+                        Box(
+                            modifier = Modifier
+                                .size(175.dp)
+                                .graphicsLayer {
+                                    rotationX = totalRotationX * 0.8f
+                                    rotationY = totalRotationY * 0.8f
+                                    rotationZ = -rotationAngle * 0.5f
+                                    cameraDistance = 12f * density
+                                }
+                                .border(
+                                    1.dp,
+                                    Brush.sweepGradient(
+                                        colors = listOf(Color.Transparent, NovaTertiary, Color.White, NovaTertiary, Color.Transparent)
+                                    ),
+                                    CircleShape
+                                )
+                        )
+
+                        // Holographic data label overlay
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(top = 16.dp, start = 16.dp)
+                                .offset(y = hologramFloat.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0x33A100FF))
+                                .border(1.dp, NovaPrimary.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .graphicsLayer {
+                                    rotationX = totalRotationX * 0.6f
+                                    rotationY = totalRotationY * 0.6f
+                                }
+                        ) {
+                            Column {
+                                Text("MODEL: NOVA-3D-V1", fontSize = 7.sp, color = Color.White.copy(alpha = 0.8f), fontWeight = FontWeight.Bold)
+                                Text("CORE TEMP: 32.4°C", fontSize = 7.sp, color = NovaPrimary, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
             }
+
+            // Page indicators (Concentric Tech Dots)
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(vertical = 4.dp)
+            ) {
+                repeat(2) { index ->
+                    val isSelected = pagerState.currentPage == index
+                    Box(
+                        modifier = Modifier
+                            .padding(4.dp)
+                            .size(if (isSelected) 10.dp else 6.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isSelected) NovaPrimary else Color.White.copy(alpha = 0.3f)
+                            )
+                    )
+                }
+            }
+
+            // Swipe instruction cue
+            Text(
+                text = if (pagerState.currentPage == 0) "Swipe Left to view Nova 3D Core Model ✦" else "✦ Swipe Right to view Lica Avatar",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = NovaSecondary.copy(alpha = 0.8f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
 
             // Agent Identity
             Text(

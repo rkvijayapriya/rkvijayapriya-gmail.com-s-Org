@@ -1,5 +1,10 @@
 package com.example.ui.screens
 
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
@@ -25,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.MainViewModel
@@ -48,6 +54,59 @@ fun ProfileScreen(
     var editName by remember { mutableStateOf("") }
     var editUsername by remember { mutableStateOf("") }
     var editLocation by remember { mutableStateOf("") }
+
+    var activeSpeechTarget by remember { mutableStateOf<String?>(null) }
+    var activeFileTarget by remember { mutableStateOf<String?>(null) }
+
+    var selectedMediaUriName by remember { mutableStateOf<Uri?>(null) }
+    var selectedMediaNameName by remember { mutableStateOf<String?>(null) }
+
+    var selectedMediaUriUsername by remember { mutableStateOf<Uri?>(null) }
+    var selectedMediaNameUsername by remember { mutableStateOf<String?>(null) }
+
+    var selectedMediaUriLocation by remember { mutableStateOf<Uri?>(null) }
+    var selectedMediaNameLocation by remember { mutableStateOf<String?>(null) }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val fName = uri.lastPathSegment ?: "Selected File"
+            when (activeFileTarget) {
+                "name" -> {
+                    selectedMediaUriName = uri
+                    selectedMediaNameName = fName
+                }
+                "username" -> {
+                    selectedMediaUriUsername = uri
+                    selectedMediaNameUsername = fName
+                }
+                "location" -> {
+                    selectedMediaUriLocation = uri
+                    selectedMediaNameLocation = fName
+                }
+            }
+            Toast.makeText(context, "File selected: $fName", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val speechRecognizerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val data = result.data
+            val results = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            if (!results.isNullOrEmpty()) {
+                val spokenText = results[0]
+                when (activeSpeechTarget) {
+                    "name" -> editName = if (editName.isBlank()) spokenText else "$editName $spokenText"
+                    "username" -> editUsername = if (editUsername.isBlank()) spokenText else "$editUsername $spokenText"
+                    "location" -> editLocation = if (editLocation.isBlank()) spokenText else "$editLocation $spokenText"
+                }
+                Toast.makeText(context, "Voice input appended!", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     // Init form when userAccount loads
     LaunchedEffect(userAccount) {
@@ -214,8 +273,53 @@ fun ProfileScreen(
                                         unfocusedContainerColor = MaterialTheme.colorScheme.surface
                                     ),
                                     shape = RoundedCornerShape(24.dp),
-                                    modifier = Modifier.fillMaxWidth().testTag("edit_name_input")
+                                    modifier = Modifier.fillMaxWidth().testTag("edit_name_input"),
+                                    trailingIcon = {
+                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
+                                            IconButton(onClick = { activeFileTarget = "name"; filePickerLauncher.launch("*/*") }) {
+                                                Icon(Icons.Default.Add, contentDescription = "Add Attachment", tint = MaterialTheme.colorScheme.primary)
+                                            }
+                                            IconButton(onClick = {
+                                                activeSpeechTarget = "name"
+                                                try {
+                                                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                                                    }
+                                                    speechRecognizerLauncher.launch(intent)
+                                                } catch (e: Exception) {
+                                                    Toast.makeText(context, "Speech recognition not supported on this device", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }) {
+                                                Icon(Icons.Default.Mic, contentDescription = "Speak text", tint = MaterialTheme.colorScheme.primary)
+                                            }
+                                        }
+                                    }
                                 )
+
+                                selectedMediaUriName?.let { uri ->
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                        Text(
+                                            text = "Attached: $selectedMediaNameName",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        )
+                                        IconButton(onClick = { selectedMediaUriName = null; selectedMediaNameName = null }, modifier = Modifier.size(16.dp)) {
+                                            Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(12.dp))
+                                        }
+                                    }
+                                }
 
                                 OutlinedTextField(
                                     value = editUsername,
@@ -230,8 +334,53 @@ fun ProfileScreen(
                                         unfocusedContainerColor = MaterialTheme.colorScheme.surface
                                     ),
                                     shape = RoundedCornerShape(24.dp),
-                                    modifier = Modifier.fillMaxWidth().testTag("edit_username_input")
+                                    modifier = Modifier.fillMaxWidth().testTag("edit_username_input"),
+                                    trailingIcon = {
+                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
+                                            IconButton(onClick = { activeFileTarget = "username"; filePickerLauncher.launch("*/*") }) {
+                                                Icon(Icons.Default.Add, contentDescription = "Add Attachment", tint = MaterialTheme.colorScheme.primary)
+                                            }
+                                            IconButton(onClick = {
+                                                activeSpeechTarget = "username"
+                                                try {
+                                                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                                                    }
+                                                    speechRecognizerLauncher.launch(intent)
+                                                } catch (e: Exception) {
+                                                    Toast.makeText(context, "Speech recognition not supported on this device", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }) {
+                                                Icon(Icons.Default.Mic, contentDescription = "Speak text", tint = MaterialTheme.colorScheme.primary)
+                                            }
+                                        }
+                                    }
                                 )
+
+                                selectedMediaUriUsername?.let { uri ->
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                        Text(
+                                            text = "Attached: $selectedMediaNameUsername",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        )
+                                        IconButton(onClick = { selectedMediaUriUsername = null; selectedMediaNameUsername = null }, modifier = Modifier.size(16.dp)) {
+                                            Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(12.dp))
+                                        }
+                                    }
+                                }
 
                                 OutlinedTextField(
                                     value = editLocation,
@@ -246,8 +395,53 @@ fun ProfileScreen(
                                         unfocusedContainerColor = MaterialTheme.colorScheme.surface
                                     ),
                                     shape = RoundedCornerShape(24.dp),
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxWidth(),
+                                    trailingIcon = {
+                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
+                                            IconButton(onClick = { activeFileTarget = "location"; filePickerLauncher.launch("*/*") }) {
+                                                Icon(Icons.Default.Add, contentDescription = "Add Attachment", tint = MaterialTheme.colorScheme.primary)
+                                            }
+                                            IconButton(onClick = {
+                                                activeSpeechTarget = "location"
+                                                try {
+                                                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                                                    }
+                                                    speechRecognizerLauncher.launch(intent)
+                                                } catch (e: Exception) {
+                                                    Toast.makeText(context, "Speech recognition not supported on this device", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }) {
+                                                Icon(Icons.Default.Mic, contentDescription = "Speak text", tint = MaterialTheme.colorScheme.primary)
+                                            }
+                                        }
+                                    }
                                 )
+
+                                selectedMediaUriLocation?.let { uri ->
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                        Text(
+                                            text = "Attached: $selectedMediaNameLocation",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        )
+                                        IconButton(onClick = { selectedMediaUriLocation = null; selectedMediaNameLocation = null }, modifier = Modifier.size(16.dp)) {
+                                            Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(12.dp))
+                                        }
+                                    }
+                                }
 
                                 Spacer(modifier = Modifier.height(4.dp))
 

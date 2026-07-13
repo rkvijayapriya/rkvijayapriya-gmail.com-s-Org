@@ -83,14 +83,24 @@ class ElevenLabsRepository {
     suspend fun generateSpeechToFile(
         text: String,
         cacheDir: File,
-        voiceId: String = defaultVoiceId
+        voiceId: String = defaultVoiceId,
+        stability: Double = 0.5,
+        similarityBoost: Double = 0.75,
+        modelId: String = "eleven_monolingual_v1"
     ): String? {
         val apiKey = BuildConfig.ELEVENLABS_API_KEY
         if (apiKey.isEmpty() || apiKey == "YOUR_ELEVENLABS_API_KEY") {
             return null
         }
 
-        val request = ElevenLabsRequest(text = text)
+        val request = ElevenLabsRequest(
+            text = text,
+            modelId = modelId,
+            voiceSettings = ElevenLabsVoiceSettings(
+                stability = stability,
+                similarityBoost = similarityBoost
+            )
+        )
 
         return try {
             val responseBody = apiService.generateSpeech(voiceId, apiKey, request)

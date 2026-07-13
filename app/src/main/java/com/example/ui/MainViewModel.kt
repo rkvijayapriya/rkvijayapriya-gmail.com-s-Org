@@ -239,6 +239,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Active Playing State
     val activeCreation = MutableStateFlow<VisionAiCreation?>(null)
 
+    // Workspace Images State
+    val workspaceImages = MutableStateFlow<List<VisionAiCreation>>(emptyList())
+
+    fun addImageToWorkspace(creation: VisionAiCreation) {
+        workspaceImages.value = workspaceImages.value + creation
+    }
+
+    fun removeImageFromWorkspace(creation: VisionAiCreation) {
+        workspaceImages.value = workspaceImages.value - creation
+    }
+
+    fun clearWorkspace() {
+        workspaceImages.value = emptyList()
+    }
+
     init {
         // Initialize Firebase programmatically
         try {
@@ -786,6 +801,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         voiceGender: String,
         accent: String,
         voiceId: String? = null,
+        stability: Double = 0.5,
+        similarityBoost: Double = 0.75,
+        modelId: String = "eleven_monolingual_v1",
         onComplete: (VisionAiCreation) -> Unit
     ) {
         if (text.isBlank()) return
@@ -824,7 +842,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (hasElevenLabsKey && voiceId != null) {
                 generationStep.value = if (currentLanguage.value == "ta") "ElevenLabs குரல் மூலம் ஒலியை உருவாக்குகிறது..." else "Synthesizing Premium ElevenLabs Voice..."
                 try {
-                    val path = elevenLabsRepo.generateSpeechToFile(text, cacheDir, voiceId)
+                    val path = elevenLabsRepo.generateSpeechToFile(
+                        text = text,
+                        cacheDir = cacheDir,
+                        voiceId = voiceId,
+                        stability = stability,
+                        similarityBoost = similarityBoost,
+                        modelId = modelId
+                    )
                     if (path != null) {
                         generatedFilePath = path
                         isElevenLabsUsed = true
@@ -889,6 +914,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             viewModelScope.launch(Dispatchers.Main) {
                 onComplete(saved)
+            }
+        }
+    }
+
+    fun translateText(
+        text: String,
+        onComplete: (String) -> Unit
+    ) {
+        if (text.isBlank()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val systemInstruction = "You are a professional bidirectional translator. If the input text is in English, translate it to Tamil. If the input text is in Tamil or any other language, translate it to English. Output ONLY the raw translated text, with no extra tags, introductory sentences, explanations, or quotes."
+                val response = geminiRepo.generateCreativeContent(text, systemInstruction)
+                val finalResult = if (response.trim().startsWith("Error") || response.isBlank()) {
+                    "Translation failed or timed out."
+                } else {
+                    response
+                }
+                viewModelScope.launch(Dispatchers.Main) {
+                    onComplete(finalResult)
+                }
+            } catch (e: java.lang.Exception) {
+                viewModelScope.launch(Dispatchers.Main) {
+                    onComplete("Translation failed: ${e.localizedMessage}")
+                }
             }
         }
     }

@@ -1,5 +1,9 @@
 package com.example.ui.screens
 
+import android.speech.RecognizerIntent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -24,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.MainViewModel
@@ -88,9 +93,38 @@ fun VoiceOverScreen(
     val scale by viewModel.fontScale.collectAsState()
     val isGenerating by viewModel.isGenerating.collectAsState()
     val generationProgress by viewModel.generationProgress.collectAsState()
+    val generationStep by viewModel.generationStep.collectAsState()
     val activeItem by viewModel.activeCreation.collectAsState()
 
     var textInput by remember { mutableStateOf("") }
+
+    var selectedMediaUriText by remember { mutableStateOf<Uri?>(null) }
+    var selectedMediaNameText by remember { mutableStateOf<String?>(null) }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val fName = uri.lastPathSegment ?: "Selected File"
+            selectedMediaUriText = uri
+            selectedMediaNameText = fName
+            Toast.makeText(context, "File selected: $fName", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val speechRecognizerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val data = result.data
+            val results = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            if (!results.isNullOrEmpty()) {
+                val spokenText = results[0]
+                textInput = if (textInput.isBlank()) spokenText else "$textInput $spokenText"
+                Toast.makeText(context, "Voice input appended!", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
     var liveConversationalActive by remember { mutableStateOf(false) }
     val liveChatHistory = remember { mutableStateListOf<Pair<String, String>>() }
     var micMuted by remember { mutableStateOf(false) }
@@ -604,8 +638,52 @@ fun VoiceOverScreen(
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface
                 ),
-                shape = RoundedCornerShape(24.dp)
+                shape = RoundedCornerShape(24.dp),
+                trailingIcon = {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
+                        IconButton(onClick = { filePickerLauncher.launch("*/*") }) {
+                            Icon(Icons.Default.Add, contentDescription = "Add Attachment", tint = MaterialTheme.colorScheme.primary)
+                        }
+                        IconButton(onClick = {
+                            try {
+                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                                }
+                                speechRecognizerLauncher.launch(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Speech recognition not supported on this device", Toast.LENGTH_SHORT).show()
+                            }
+                        }) {
+                            Icon(Icons.Default.Mic, contentDescription = "Speak text", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
             )
+
+            selectedMediaUriText?.let { uri ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text(
+                        text = "Attached: $selectedMediaNameText",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    IconButton(onClick = { selectedMediaUriText = null; selectedMediaNameText = null }, modifier = Modifier.size(16.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(12.dp))
+                    }
+                }
+            }
 
             // Interactive Clipboard Assist Row for TTS Input Text
             Row(
@@ -1231,7 +1309,39 @@ fun VoiceOverScreen(
 
             // BUILT-IN PREMIUM AUDIO PLAYER PREVIEW
             if (isGenerating) {
-                AudioPlayerSkeleton()
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AudioPlayerSkeleton()
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(16.dp))
+                            .padding(16.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 3.dp,
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = generationStep.ifBlank { "Synthesizing audio..." },
+                            fontSize = 11.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "${(generationProgress * 100).toInt()}% Completed",
+                            fontSize = 10.sp,
+                            color = Color.White.copy(alpha = 0.8f)
+                        )
+                    }
+                }
             } else if (activeItem != null && activeItem?.type == "VOICEOVER") {
                 Card(
                     modifier = Modifier
